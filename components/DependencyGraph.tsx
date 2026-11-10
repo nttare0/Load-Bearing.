@@ -2,8 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  Background,
-  BackgroundVariant,
   Controls,
   Handle,
   Position,
@@ -39,7 +37,7 @@ function ClaimNode({ data }: NodeProps) {
         if (e.key === "Enter" || e.key === " ") onFocus(claim);
       }}
       className={cn(
-        "w-[13.5rem] cursor-pointer rounded-[var(--to-radius)] border border-border bg-[var(--to-surface)] px-[0.625rem] py-[0.5rem] text-left shadow-[var(--to-shadow)] transition-[border-color,box-shadow] hover:border-[var(--to-accent)] hover:shadow-[0_0_0_1px_var(--to-accent),var(--to-shadow)]"
+        "lb-hover-ring w-[13.5rem] cursor-pointer rounded-[var(--to-radius)] border border-border bg-transparent px-[0.625rem] py-[0.5rem] text-left"
       )}
       style={{ borderTop: `2px solid ${accent}` }}
     >
@@ -157,7 +155,7 @@ export function DependencyGraph({
   const hasEdges = edges.length > 0;
 
   return (
-    <div className="relative h-[32rem] w-full overflow-hidden rounded-[var(--to-radius)] border border-border bg-[var(--to-surface)]">
+    <div className="relative h-[32rem] w-full overflow-hidden rounded-[var(--to-radius)] border border-border bg-transparent">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -171,25 +169,24 @@ export function DependencyGraph({
         edgesFocusable={false}
         panOnScroll
       >
-        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--to-border)" />
         <Controls
           showInteractive={false}
-          className="!rounded-[var(--to-radius-sm)] !border !border-border !bg-[var(--to-surface)] !shadow-none [&>button]:!border-border [&>button]:!bg-[var(--to-surface)] [&>button]:!text-ink-2"
+          className="!rounded-[var(--to-radius-sm)] !border !border-border !bg-transparent !shadow-none [&>button]:!border-border [&>button]:!bg-transparent [&>button]:!text-ink-2"
         />
       </ReactFlow>
 
       {!hasEdges && (
-        <p className="pointer-events-none absolute left-1/2 bottom-4 -translate-x-1/2 rounded-full border border-border bg-background px-3 py-1 text-[11px] text-muted-foreground">
+        <p className="lb-hint pointer-events-none absolute left-1/2 bottom-3 -translate-x-1/2 text-[0.75rem]">
           No claim depends on another.
         </p>
       )}
 
-      <div className="pointer-events-none absolute left-3 top-3 max-w-[220px] rounded-lg border border-border bg-background/90 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground backdrop-blur">
+      <div className="pointer-events-none absolute left-3 top-3 max-w-[15rem] rounded-[var(--to-radius-sm)] border border-border bg-background px-[0.5rem] py-[0.375rem] text-[0.75rem] leading-[1.4] text-ink-2">
         Read bottom-up: a node only matters if the claim above it is true.
       </div>
 
       {selected && (
-        <div className="absolute right-3 top-3 max-w-[17rem] rounded-[var(--to-radius)] border border-border bg-[var(--to-surface)] p-[0.625rem] text-[0.8125rem] shadow-[var(--to-shadow-pop)]">
+        <div className="absolute right-3 top-3 max-w-[17rem] rounded-[var(--to-radius)] border border-border bg-background p-[0.625rem] text-[0.8125rem]">
           <p className="font-medium text-foreground">{selected.claim}</p>
           <p className="lb-hint mt-[0.25rem]">
             impact {selected.impact}/5 · {selected.confidence} · {selected.category}

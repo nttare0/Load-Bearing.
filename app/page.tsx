@@ -458,7 +458,7 @@ function Progress({
         <div className="flex flex-col gap-2">
           <p className="lb-hint text-[0.75rem]">Arriving. Sorted once scoring finishes.</p>
           {claims.slice(0, 3).map((claim) => (
-            <Card key={claim.id} className="animate-rise gap-3 rounded-[var(--to-radius)] border-border py-4 shadow-[var(--to-shadow)]">
+            <Card key={claim.id} className="animate-rise gap-3 rounded-[var(--to-radius)] border-border bg-transparent py-4">
               <CardContent className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <Badge variant={claim.source === "implied" ? "structural" : "outline"}>

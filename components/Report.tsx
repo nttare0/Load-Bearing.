@@ -87,7 +87,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
 
   return (
     <div className="flex flex-col gap-[1rem]">
-      <Card className="gap-0 overflow-hidden rounded-[var(--to-radius)] border-border py-0 shadow-[var(--to-shadow)]">
+      <Card className="gap-0 overflow-hidden rounded-[var(--to-radius)] border-border bg-transparent py-0">
         <div className="flex flex-col gap-[0.75rem] p-[1rem]">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
@@ -153,7 +153,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
       )}
 
       <Tabs defaultValue="ranked">
-        <TabsList>
+        <TabsList variant="line">
           <TabsTrigger value="ranked">Ranked list</TabsTrigger>
           <TabsTrigger value="graph">Dependency map</TabsTrigger>
           <TabsTrigger value="premortem">Pre-mortem</TabsTrigger>
@@ -190,7 +190,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
             analysis.failureModes.map((mode, i) => {
               const claim = analysis.claims.find((c) => c.ref === mode.claimRef);
               return (
-                <Card key={`${mode.claimRef}-${i}`} className="gap-[0.5rem] rounded-[var(--to-radius)] border-border py-[0.875rem] shadow-[var(--to-shadow)]">
+                <Card key={`${mode.claimRef}-${i}`} className="gap-[0.5rem] rounded-[var(--to-radius)] border-border bg-transparent py-[0.875rem]">
                   <CardHeader>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
@@ -228,7 +228,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
 
         <TabsContent value="markdown">
           <div className="relative">
-            <pre className="lb-mono max-h-[32rem] overflow-auto rounded-[var(--to-radius)] border border-border bg-[var(--to-surface-2)] p-[0.75rem] text-[0.75rem] leading-[1.6] text-ink-2 whitespace-pre-wrap">
+            <pre className="lb-mono max-h-[32rem] overflow-auto rounded-[var(--to-radius)] border border-border p-[0.75rem] text-[0.75rem] leading-[1.6] text-ink-2 whitespace-pre-wrap">
               {markdown}
             </pre>
             <Button

@@ -33,7 +33,7 @@ export function ClaimCard({ claim, claims, outcome, onOutcome, canRecord }: Prop
         : "border-l-light-partition";
 
   return (
-    <Card className={cn("animate-rise gap-0 overflow-hidden rounded-[var(--to-radius)] border-border border-l-2 py-0 shadow-[var(--to-shadow)] transition-[border-color,box-shadow] hover:shadow-[0_0_0_1px_var(--to-border-strong),var(--to-shadow)]", accent)}>
+    <Card className={cn("animate-rise gap-0 overflow-hidden rounded-[var(--to-radius)] border-border border-l-2 bg-transparent py-0 transition-colors", accent)}>
       <div className="flex flex-col gap-[0.625rem] p-[0.875rem]">
         <div className="flex flex-wrap items-center gap-2">
           <span className="lb-mono text-[0.75rem] text-ink-3">#{claim.rank}</span>
@@ -72,7 +72,7 @@ export function ClaimCard({ claim, claims, outcome, onOutcome, canRecord }: Prop
             {dependencies.map((d) => (
               <span
                 key={d.ref}
-                className="lb-mono rounded-[0.25rem] border border-border bg-[var(--to-surface-2)] px-[0.375em] py-[0.0625em] text-[0.6875rem] text-ink-2"
+                className="lb-mono rounded-[0.25rem] border border-border px-[0.375em] py-[0.0625em] text-[0.6875rem] text-ink-2"
                 title={d.claim}
               >
                 {d.ref}
@@ -122,7 +122,7 @@ export function ClaimCard({ claim, claims, outcome, onOutcome, canRecord }: Prop
         )}
 
         {claim.test ? (
-          <div className="rounded-[var(--to-radius-sm)] border border-border bg-[var(--to-surface)]">
+          <div className="rounded-[var(--to-radius-sm)] border border-border">
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}

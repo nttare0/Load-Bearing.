@@ -100,7 +100,7 @@ export function PlanInput({ onSubmit, busy }: Props) {
   };
 
   return (
-    <Card className="gap-0 overflow-hidden rounded-[var(--to-radius)] border-border py-0 shadow-[var(--to-shadow)]">
+    <Card className="gap-0 overflow-hidden rounded-[var(--to-radius)] border-border bg-transparent py-0">
       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2">
         <label htmlFor="plan" className="lb-label text-[0.75rem]">
           The plan
@@ -165,7 +165,7 @@ export function PlanInput({ onSubmit, busy }: Props) {
               type="button"
               onClick={() => setText(example.text)}
               disabled={busy}
-              className="h-7 rounded-[var(--to-radius-sm)] border border-border bg-[var(--to-surface)] px-2 text-[0.75rem] text-ink-3 transition-colors hover:border-[var(--to-accent)] hover:text-foreground disabled:opacity-50"
+              className="h-7 rounded-[var(--to-radius-sm)] border border-border px-2 text-[0.75rem] text-ink-3 transition-colors hover:border-[var(--to-accent)] hover:text-foreground disabled:opacity-50"
             >
               {example.label}
             </button>
