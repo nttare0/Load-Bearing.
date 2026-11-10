@@ -1,14 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PanelLeft, Plus } from "lucide-react";
+import { PanelLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Composer } from "@/components/Composer";
 import { assignKeys } from "@/lib/diff";
 import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
-import { WorkspaceRail } from "@/components/WorkspaceRail";
+import { WorkspacePanel } from "@/components/WorkspacePanel";
 import { Button } from "@/components/ui/button";
+import { BeamToggle } from "@/components/BeamToggle";
 import type { Analysis } from "@/lib/schema";
 import {
   createWorkspace,
@@ -30,7 +31,7 @@ function reportsOf(workspace: Workspace, analyses: Record<string, Analysis>): An
     .map((m) => (m.analysisId ? analyses[m.analysisId] : undefined))
     .filter((a): a is Analysis => Boolean(a));
 }
-const LS_RAIL = "load-bearing:rail-collapsed";
+const LS_PANEL = "load-bearing:panel-open";
 
 /**
  * The application shell: workspaces on the left, one thread in the middle.
@@ -41,11 +42,15 @@ const LS_RAIL = "load-bearing:rail-collapsed";
  * rather than a result you navigate away from.
  */
 export default function Home() {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  // Seeded optimistically so the rail always has a workspace in it. The values
+  // are replaced from storage in the effect below; ids are stable enough for
+  // that to be a no-op when hydration agrees.
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => [createWorkspace("First workspace")]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [railCollapsed, setRailCollapsed] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [keep, setKeep] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"demo" | "live" | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -56,7 +61,7 @@ export default function Home() {
     try {
       const stored = localStorage.getItem(LS_ANALYSES);
       if (stored) setAnalyses(JSON.parse(stored) as Record<string, Analysis>);
-      setRailCollapsed(localStorage.getItem(LS_RAIL) === "1");
+      setPanelOpen(localStorage.getItem(LS_PANEL) === "1");
       setPlans(readPlans());
     } catch {
       // A corrupt cache is not worth a dialog.
@@ -80,8 +85,10 @@ export default function Home() {
       .catch(() => setMode(null));
   }, []);
 
+  // Fall back to the first workspace so the first frame is the real canvas
+  // rather than "Loading", which then swaps out under the user.
   const current = useMemo(
-    () => workspaces.find((w) => w.id === currentId) ?? null,
+    () => workspaces.find((w) => w.id === currentId) ?? workspaces[0] ?? null,
     [workspaces, currentId]
   );
 
@@ -387,8 +394,8 @@ export default function Home() {
   const select = useCallback((id: string) => {
     setCurrentId(id);
     writeCurrentId(id);
-    // On a small screen the rail is an overlay, so picking one closes it.
-    if (window.matchMedia("(max-width: 1023px)").matches) setRailCollapsed(true);
+    // The panel is a drawer: picking a workspace closes it.
+    setPanelOpen(false);
   }, []);
 
   const create = useCallback(() => {
@@ -417,10 +424,10 @@ export default function Home() {
     [plans]
   );
 
-  const toggleRail = useCallback(() => {
-    setRailCollapsed((prev) => {
+  const togglePanel = useCallback(() => {
+    setPanelOpen((prev) => {
       try {
-        localStorage.setItem(LS_RAIL, prev ? "0" : "1");
+        localStorage.setItem(LS_PANEL, prev ? "0" : "1");
       } catch {
         // Not worth reporting.
       }
@@ -428,88 +435,74 @@ export default function Home() {
     });
   }, []);
 
+  // Escape closes the panel, as it would a drawer anywhere else.
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPanelOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [panelOpen]);
+
   return (
-    <div className="flex min-h-dvh">
-      <WorkspaceRail
+    <div className="relative flex min-h-dvh flex-col">
+      <WorkspacePanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
         workspaces={workspaces}
         currentId={currentId}
         analyses={analyses}
         onSelect={select}
         onCreate={create}
         onDelete={remove}
-        collapsed={railCollapsed}
-        onToggle={toggleRail}
       />
 
-      {!railCollapsed && (
-        <div
-          className="fixed inset-0 z-30 bg-black/20 lg:hidden"
-          onClick={toggleRail}
-          aria-hidden
-        />
-      )}
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="to-header sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-sm">
-          <div className="flex h-[var(--to-header-h)] items-center justify-between gap-[0.75rem] px-[1rem]">
-            <div className="flex min-w-0 items-center gap-[0.5rem]">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 lg:hidden"
-                onClick={() => setRailCollapsed((prev) => !prev)}
-                aria-label="Workspaces"
-              >
-                <PanelLeft className="size-4" />
-              </Button>
-              <a href="/" className="lb-wordmark flex items-center gap-[0.4em] text-[1.125rem] text-foreground no-underline">
-                <BeamMark />
-                Load-Bearing
-              </a>
-              <span className="hidden h-4 w-px bg-[var(--to-border)] sm:block" aria-hidden />
-              <span className="hidden min-w-0 truncate text-[0.8125rem] text-ink-3 sm:block">
-                {current?.name ?? "Workspace"}
-              </span>
-            </div>
-            <div className="flex items-center gap-[0.25rem]">
-              <Button variant="ghost" size="sm" className="lg:hidden" onClick={create}>
-                <Plus className="size-3.5" /> New
-              </Button>
-              <a
-                href="https://github.com/nttare0/Load-Bearing."
-                className="hidden text-[0.75rem] text-ink-3 no-underline hover:text-foreground sm:block"
-              >
-                Source
-              </a>
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto flex w-full max-w-[52rem] flex-1 flex-col gap-[1.25rem] px-[1rem] py-[1.25rem]">
-          <ThreadWorkspace
-            workspace={current}
-            analyses={analyses}
-            prevOf={prevOf}
-            planOf={planOf}
-            onOutcome={recordOutcome}
-            onDeleteReport={deleteReport}
-            onRerun={rerun}
-            busy={busy}
-          />
-          <div ref={endRef} />
-        </main>
-
-        <div className="sticky bottom-0 z-20 border-t border-border bg-background/95 backdrop-blur-sm">
-          <div className="mx-auto w-full max-w-[52rem] px-[1rem] py-[0.75rem]">
-            <Composer onAnalyze={analyze} onAsk={ask} busy={busy} mode={mode} />
-          </div>
-        </div>
+      {/* No header bar: the reference keeps the canvas clean and puts the one
+          control it needs in the top-left corner. */}
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between px-[0.75rem] py-[0.625rem]">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="pointer-events-auto size-8 text-ink-3 hover:text-foreground"
+          onClick={togglePanel}
+          aria-label={panelOpen ? "Close workspaces" : "Open workspaces"}
+          aria-expanded={panelOpen}
+        >
+          <PanelLeft className="size-4" />
+        </Button>
+        <BeamToggle />
       </div>
+
+      <main className="mx-auto flex w-full max-w-[46rem] flex-1 flex-col px-[1rem] pt-[3.75rem] pb-[1.5rem]">
+        <ThreadWorkspace
+          workspace={current}
+          analyses={analyses}
+          prevOf={prevOf}
+          planOf={planOf}
+          onOutcome={recordOutcome}
+          onDeleteReport={deleteReport}
+          onRerun={rerun}
+          busy={busy}
+          composer={
+            <Composer
+              onAnalyze={analyze}
+              onAsk={ask}
+              busy={busy}
+              aiMode={mode}
+              workspaceName={current?.name ?? "Workspace"}
+              keep={keep}
+              onKeepChange={setKeep}
+              recent={current ? reportsOf(current, analyses).map((a) => ({ id: a.id, title: a.title })) : []}
+            />
+          }
+        />
+        <div ref={endRef} />
+      </main>
     </div>
   );
 }
 
-/** The wordmark's beam: four members of a truss, drawn, not an icon font. */
 function BeamMark() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden className="size-[1em] shrink-0">

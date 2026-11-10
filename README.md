@@ -219,25 +219,29 @@ shows one run, not a history the reader cannot verify.
 
 ## One workspace, one thread
 
-The page is a workspace, not a form. The left rail lists workspaces; the middle
-column is that workspace's thread; the composer at the bottom is always in reach.
+The page has **no header**. A question in serif, a composer under it, and one
+small control in the top-left that opens the workspace panel. Identity is inside
+that panel (the wordmark lives there, and as a mark top-right), so the canvas is
+never divided by a navigation bar.
 
-A workspace owns its plans, the reports they produced and the questions asked
-about them. Pasting a plan adds two turns (your text, the report). Asking a
-question adds two more (your question, the answer). Nothing leaves the browser
-except the single analysis the pipeline is asked to store, so the rail works
-before any account or database exists.
+The workspace panel is a **drawer**, closed by default: a rail pinned to the left
+of every screen is chrome you pay for whether or not you are using it. Click the
+toggle (or press Escape to close) and it slides over the canvas. Picking a
+workspace closes it again.
 
-**Two verbs, one box.** The composer decides between *analyse* and *answer* from
-what you typed — a question mark, or a question word in a short message — and
-says which it is about to do next to the send button. It never guesses silently.
+The composer keeps its position whether the workspace is empty or full, so
+starting work never moves the thing you are typing into. A workspace owns its
+plans, the reports they produced and the questions asked about them.
+
+**Two verbs, one box.** A short message that asks something is answered; anything
+else is analysed. The verb is a control in the composer — click it to switch a
+question into a plan — and never a silent guess.
 
 `POST /api/ask` is deliberately read-only. It is handed a summary of the
-workspace's reports and can only answer in prose: it cannot add a claim, change
-a score or record a test. Claims only ever come from the five-pass pipeline,
+workspace's reports and can only answer in prose: it cannot add a claim, change a
+score or record a test. Claims only ever come from the five-pass pipeline,
 because a claim has to arrive with a quote, a score and a test. An answer is not
-evidence, and each one says so underneath, along with what it looked at
-(`read 1 reports · 9 claims · 0 tested`).
+evidence, and each one says so underneath, along with what it looked at.
 
 Without `ANTHROPIC_API_KEY`, research answers are composed from the report data
 itself — no model, and it says so rather than pretending.
@@ -301,9 +305,10 @@ lib/
   extract.ts            dependency-free PDF/DOCX/HTML text extraction
   store.ts              localStorage-first storage, Supabase when available
 components/
-  WorkspaceRail         left rail: workspaces, collapsed to icons
+  WorkspacePanel        the drawer: workspaces, opened from the top-left
   Thread                the conversation, reports set in place
   Composer              paste to analyse, ask to research
+  BeamToggle            the one piece of chrome, top-right
   ClaimCard             one claim, its quote, its evidence, its test
   DependencyGraph       React Flow map, layered by dependency depth
   PriorityChart         the ranking, drawn with Bklit's bar chart
