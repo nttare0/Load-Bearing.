@@ -270,38 +270,45 @@ export default function Home() {
   const started = busy || claims.length > 0 || Boolean(analysis);
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
-      <header className="flex flex-col gap-5">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
+    <div className="min-h-dvh">
+      {/* The header is nav, not document: wordmark in Plex Serif at the column
+          edge, one plain action at the other end, a hairline under it. */}
+      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-sm">
+        <div className="mx-auto flex h-14 w-full max-w-[var(--to-max-w)] items-center justify-between gap-4 px-4 sm:px-6">
+          <a href="/" className="lb-wordmark flex items-center gap-2 text-[1.25rem] text-foreground no-underline">
             <BeamMark />
-            <span className="text-[15px] font-semibold tracking-tight">Load-Bearing</span>
-          </div>
-          <a
-            href="#how"
-            className="flex items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-          >
-            How it works <ArrowUpRight className="h-3 w-3" />
+            Load-Bearing
           </a>
+          <div className="flex items-center gap-1">
+            <a
+              href="#how"
+              className="flex h-9 items-center gap-1.5 rounded-[var(--to-radius-sm)] px-2.5 text-[0.8125rem] text-muted-foreground no-underline transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              How it works <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+          </div>
         </div>
+      </header>
 
-        <div className="flex flex-col gap-3">
-          <h1 className="max-w-2xl text-[28px] leading-[1.15] font-semibold tracking-tight sm:text-[36px]">
+      <main className="mx-auto flex w-full max-w-[var(--to-max-w)] flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2.5">
+          <h1 className="max-w-3xl text-[1.5rem] leading-[1.2] font-semibold tracking-[-0.01em] text-foreground sm:text-[1.875rem]">
             Find the assumptions your plan quietly depends on.
           </h1>
-          <p className="max-w-2xl text-[14.5px] leading-relaxed text-muted-foreground">
+          <p className="max-w-2xl text-[0.9375rem] leading-[var(--to-line)] text-ink-2">
             In a building, the load-bearing wall is the one holding up everything above it. Plans work the same way:
             a few claims carry most of the weight, and most of them are never written down. Paste a plan and this
             ranks those claims by how much collapses if they are wrong — then gives you the cheapest way to check.
           </p>
           <StatusLegend />
         </div>
-      </header>
+      </div>
 
       <PlanInput onSubmit={run} busy={busy} />
 
       {history.length > 0 && !started && (
-        <Card className="gap-3 py-4 shadow-card">
+        <Card className="gap-3 rounded-[var(--to-radius)] border-border py-4 shadow-[var(--to-shadow)]">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-[13px]">
               <History className="h-3.5 w-3.5 text-muted-foreground" /> Recent on this device
@@ -327,11 +334,11 @@ export default function Home() {
       <div ref={resultsRef} />
 
       {error && (
-        <div className="flex items-start gap-3 rounded-lg border border-[#b4451f]/30 bg-[#fbe8e0] px-4 py-3">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#96391b]" />
+        <div className="flex items-start gap-3 rounded-lg border border-[var(--lb-load)]/30 bg-[var(--lb-load-soft)] px-4 py-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--lb-load)]" />
           <div className="flex flex-col gap-1">
-            <p className="text-[13px] font-medium text-[#7f2f14]">That run did not finish</p>
-            <p className="text-[12.5px] leading-relaxed text-[#8f4a2c]">{error}</p>
+            <p className="text-[13px] font-medium text-[var(--lb-load)]">That run did not finish</p>
+            <p className="text-[12.5px] leading-relaxed text-[var(--to-ink-2)]">{error}</p>
           </div>
         </div>
       )}
@@ -365,7 +372,7 @@ export default function Home() {
                 body: "Each top claim gets the cheapest disproof, with the number that means proceed and the number that means stop.",
               },
             ].map((item) => (
-              <Card key={item.title} className="gap-2 bg-card/70 py-4 shadow-none">
+              <Card key={item.title} className="lb-interactive gap-2 rounded-[var(--to-radius)] border-border bg-card py-4 shadow-[var(--to-shadow)]">
                 <CardHeader>
                   <CardTitle className="text-[13.5px]">{item.title}</CardTitle>
                   <CardDescription className="text-[12.5px]">{item.body}</CardDescription>
@@ -385,7 +392,8 @@ export default function Home() {
         </span>
         <span>No accounts. No tracking. A fact label needs a URL.</span>
       </footer>
-    </main>
+      </main>
+    </div>
   );
 }
 
@@ -399,10 +407,10 @@ function readHistory(): StoredHistory[] {
 
 function BeamMark() {
   return (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-      <rect x="2" y="2" width="18" height="18" rx="3" stroke="#191713" strokeWidth="1.4" />
-      <path d="M2 14.5h18" stroke="#191713" strokeWidth="1.4" />
-      <path d="M8 14.5V20M14 14.5V20" stroke="#b4451f" strokeWidth="1.6" />
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+      <rect x="1.5" y="1.5" width="17" height="17" rx="2.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M1.5 13h17" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M7 13v5.5M13 13v5.5" stroke="var(--lb-load)" strokeWidth="1.6" />
     </svg>
   );
 }
@@ -440,9 +448,9 @@ function Progress({
                   <span
                     className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[9px] ${
                       done
-                        ? "border-[#4a6b57] bg-[#eaf0e9] text-[#33503f]"
+                        ? "border-[var(--lb-light)] bg-[var(--lb-fact-soft)] text-[var(--lb-fact)]"
                         : active
-                          ? "border-[#b4451f] bg-[#fbe8e0] text-[#96391b]"
+                          ? "border-[var(--lb-load)] bg-[var(--lb-load-soft)] text-[var(--lb-load)]"
                           : "border-border text-muted-foreground"
                     }`}
                   >
@@ -463,7 +471,7 @@ function Progress({
             Claims are arriving. Sorted once scoring finishes.
           </p>
           {claims.slice(0, 3).map((claim) => (
-            <Card key={claim.id} className="animate-rise gap-3 py-4 shadow-card">
+            <Card key={claim.id} className="animate-rise gap-3 rounded-[var(--to-radius)] border-border py-4 shadow-[var(--to-shadow)]">
               <CardContent className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <Badge variant={claim.source === "implied" ? "structural" : "outline"}>

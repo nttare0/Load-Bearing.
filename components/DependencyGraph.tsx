@@ -24,7 +24,11 @@ type ClaimNodeData = {
 function ClaimNode({ data }: NodeProps) {
   const { claim, onFocus } = data as unknown as ClaimNodeData;
   const accent =
-    claim.priority >= 8 ? "#b4451f" : claim.priority >= 5 ? "#9a6b12" : "#4a6b57";
+    claim.priority >= 8
+      ? "var(--lb-load)"
+      : claim.priority >= 5
+        ? "var(--lb-structural)"
+        : "var(--lb-light)";
 
   return (
     <div
@@ -46,7 +50,7 @@ function ClaimNode({ data }: NodeProps) {
         </span>
         <span
           className="rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide"
-          style={{ background: `${accent}14`, color: accent }}
+          style={{ background: "var(--to-surface-2)", color: accent }}
         >
           {claim.status}
         </span>
@@ -122,7 +126,7 @@ function layout(claims: Claim[]): { nodes: Node[]; edges: Edge[] } {
         source: dep,
         target: claim.ref,
         animated: false,
-        style: { stroke: claim.priority >= 8 ? "#8a837a" : "#c4bdb1" },
+        style: { stroke: claim.priority >= 8 ? "var(--to-border-strong)" : "var(--to-border)" },
       });
     }
   }
@@ -167,7 +171,7 @@ export function DependencyGraph({
         edgesFocusable={false}
         panOnScroll
       >
-        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="#d8d1c4" />
+        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--to-border)" />
         <Controls
           showInteractive={false}
           className="!rounded-lg !border !border-border !bg-background-raised !shadow-none [&>button]:!border-border [&>button]:!bg-background-raised [&>button]:!text-muted-foreground"

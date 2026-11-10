@@ -87,14 +87,14 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
 
   return (
     <div className="flex flex-col gap-5">
-      <Card className="gap-0 overflow-hidden py-0 shadow-card">
+      <Card className="gap-0 overflow-hidden rounded-[var(--to-radius)] border-border py-0 shadow-[var(--to-shadow)]">
         <div className="flex flex-col gap-4 p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-load-bearing">
+              <p className="lb-label text-[0.6875rem] text-[var(--lb-load)]">
                 Load-Bearing report
               </p>
-              <h2 className="mt-1.5 text-xl font-semibold leading-tight sm:text-2xl">{analysis.title}</h2>
+              <h2 className="lb-wordmark mt-1.5 text-[1.375rem] leading-[1.2] sm:text-[1.625rem]">{analysis.title}</h2>
               <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-muted-foreground">
                 {analysis.summary}
               </p>
@@ -133,7 +133,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
             {counts.contradicted > 0 && (
               <>
                 <span>·</span>
-                <span className="text-[#96391b]">{counts.contradicted} contradicted</span>
+                <span className="text-[var(--lb-load)]">{counts.contradicted} contradicted</span>
               </>
             )}
             <span className="ml-auto flex items-center gap-1.5">
@@ -145,11 +145,11 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
       </Card>
 
       {analysis.notes.length > 0 && (
-        <div className="rounded-lg border border-[#9a6b12]/25 bg-[#f8eeda]/60 px-4 py-3">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-[#7d570f]">
+        <div className="rounded-lg border border-[var(--lb-structural)]/25 bg-[var(--lb-structural-soft)]/60 px-4 py-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--lb-structural)]">
             About this run
           </p>
-          <ul className="mt-1.5 flex flex-col gap-1 text-[12.5px] leading-relaxed text-[#5f4a1c]">
+          <ul className="mt-1.5 flex flex-col gap-1 text-[12.5px] leading-relaxed text-[var(--to-ink-2)]">
             {analysis.notes.map((note) => (
               <li key={note}>— {note}</li>
             ))}
@@ -197,7 +197,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
             analysis.failureModes.map((mode, i) => {
               const claim = analysis.claims.find((c) => c.ref === mode.claimRef);
               return (
-                <Card key={`${mode.claimRef}-${i}`} className="gap-3 py-4 shadow-card">
+                <Card key={`${mode.claimRef}-${i}`} className="gap-3 rounded-[var(--to-radius)] border-border py-4 shadow-[var(--to-shadow)]">
                   <CardHeader>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
@@ -217,7 +217,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
                         </Badge>
                       )}
                     </div>
-                    <CardTitle className="mt-1 font-normal text-[14.5px] leading-relaxed">
+                    <CardTitle className="mt-1 text-[0.9375rem] leading-[1.6] font-normal">
                       {mode.scenario}
                     </CardTitle>
                   </CardHeader>

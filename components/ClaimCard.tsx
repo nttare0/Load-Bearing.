@@ -33,7 +33,7 @@ export function ClaimCard({ claim, claims, outcome, onOutcome, canRecord }: Prop
         : "border-l-light-partition";
 
   return (
-    <Card className={cn("animate-rise gap-0 overflow-hidden border-l-[3px] bg-card py-0 shadow-card", accent)}>
+    <Card className={cn("animate-rise gap-0 overflow-hidden rounded-[var(--to-radius)] border-border border-l-2 py-0 shadow-[var(--to-shadow)] transition-[border-color,box-shadow] hover:shadow-[0_0_0_1px_var(--to-border-strong),var(--to-shadow)]", accent)}>
       <div className="flex flex-col gap-3 p-5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono-tight text-[11px] text-muted-foreground">#{claim.rank}</span>
@@ -146,13 +146,13 @@ export function ClaimCard({ claim, claims, outcome, onOutcome, canRecord }: Prop
                 <p className="text-foreground">{claim.test.method}</p>
                 <dl className="mt-3 grid gap-2 sm:grid-cols-2">
                   <div>
-                    <dt className="text-[11px] font-medium uppercase tracking-wide text-[#3c5b49]">
+                    <dt className="text-[11px] font-medium uppercase tracking-wide text-[var(--lb-light)]">
                       proceed if
                     </dt>
                     <dd className="text-muted-foreground">{claim.test.confirms}</dd>
                   </div>
                   <div>
-                    <dt className="text-[11px] font-medium uppercase tracking-wide text-[#96391b]">
+                    <dt className="text-[11px] font-medium uppercase tracking-wide text-[var(--lb-load)]">
                       stop if
                     </dt>
                     <dd className="text-muted-foreground">{claim.test.breaks}</dd>

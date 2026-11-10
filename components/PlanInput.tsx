@@ -108,10 +108,10 @@ export function PlanInput({ onSubmit, busy }: Props) {
   };
 
   return (
-    <Card className="gap-0 overflow-hidden py-0 shadow-card">
+    <Card className="gap-0 overflow-hidden rounded-[var(--to-radius)] border-border py-0 shadow-[var(--to-shadow)]">
       <div className="flex flex-col gap-3 p-5">
         <div className="flex items-center justify-between gap-3">
-          <label htmlFor="plan" className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          <label htmlFor="plan" className="lb-label text-[0.75rem]">
             The plan
           </label>
           <div className="flex items-center gap-1">
@@ -159,7 +159,7 @@ export function PlanInput({ onSubmit, busy }: Props) {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit();
           }}
           placeholder="Paste the plan, idea, design decision, or argument you are about to commit to. Three rough paragraphs is plenty — the more specific the numbers, the more it has to work with."
-          className="min-h-[220px] text-[15px]"
+          className="min-h-[200px] rounded-[var(--to-radius-sm)] text-[0.9375rem] leading-[1.6]"
           disabled={busy}
         />
 
@@ -172,7 +172,7 @@ export function PlanInput({ onSubmit, busy }: Props) {
                 type="button"
                 onClick={() => setText(example.text)}
                 disabled={busy}
-                className="rounded-full border border-border bg-background px-2.5 py-1 text-[11.5px] text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground cursor-pointer disabled:opacity-50"
+                className="rounded-[var(--to-radius-pill)] border border-border bg-surface px-2.5 py-1 text-[0.75rem] text-ink-3 transition-colors hover:border-[var(--to-accent)] hover:text-foreground cursor-pointer disabled:opacity-50 [background:var(--to-surface)]"
               >
                 {example.label}
               </button>
@@ -184,12 +184,12 @@ export function PlanInput({ onSubmit, busy }: Props) {
                 type="checkbox"
                 checked={persist}
                 onChange={(e) => setPersist(e.target.checked)}
-                className="h-3.5 w-3.5 accent-[#b4451f]"
+                className="h-3.5 w-3.5 accent-[var(--lb-load)]"
                 disabled={busy}
               />
               Keep this analysis
             </label>
-            <span className={chars > 0 && !ready ? "text-[11px] text-[#96391b]" : "text-[11px] text-muted-foreground"}>
+            <span className={chars > 0 && !ready ? "text-[11px] text-[var(--lb-load)]" : "text-[11px] text-muted-foreground"}>
               {chars.toLocaleString()} chars
             </span>
             <Button onClick={submit} disabled={!ready || busy} size="default">
@@ -207,7 +207,7 @@ export function PlanInput({ onSubmit, busy }: Props) {
         </div>
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3 text-[11px] text-muted-foreground">
-          <Badge variant="outline">⌘/Ctrl + Enter</Badge>
+          <Badge variant="outline" className="lb-mono">⌘/Ctrl + Enter</Badge>
           <span>Your plan is sent to the AI provider to be read. It is not stored unless you tick “Keep this analysis”.</span>
         </div>
       </div>

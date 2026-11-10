@@ -8,7 +8,7 @@ import { Slot } from "radix-ui";
  * so the fact/guess/unverified/contradicted vocabulary lives in one place.
  */
 const badgeVariants = cva(
-  "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3",
+  "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3",
   {
     variants: {
       variant: {
@@ -20,13 +20,13 @@ const badgeVariants = cva(
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
         // Load-Bearing additions
-        fact: "border-fact/30 bg-fact-bg text-fact",
-        guess: "border-guess/30 bg-guess-bg text-guess",
-        unverified: "border-unverified/35 bg-unverified-bg text-unverified",
-        contradicted: "border-contradicted/35 bg-contradicted-bg text-contradicted",
-        load: "border-load-bearing/25 bg-load-bearing/10 text-load-bearing",
-        structural: "border-structural/25 bg-structural/10 text-structural",
-        light: "border-light-partition/25 bg-light-partition/10 text-light-partition",
+        fact: "border-fact/25 bg-fact-soft text-fact",
+        guess: "border-guess/25 bg-guess-soft text-guess",
+        unverified: "border-unverified/25 bg-unverified-soft text-unverified",
+        contradicted: "border-contradicted/25 bg-contradicted-soft text-contradicted",
+        load: "border-load-bearing/20 bg-load-bearing-soft text-load-bearing",
+        structural: "border-structural/20 bg-structural-soft text-structural",
+        light: "border-light-partition/20 bg-light-partition-soft text-light-partition",
       },
     },
     defaultVariants: {

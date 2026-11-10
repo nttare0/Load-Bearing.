@@ -24,9 +24,9 @@ export function StatusBadge({ status }: { status: Status }) {
         aria-hidden
         className={cn(
           "h-1.5 w-1.5 rounded-full",
-          status === "fact" && "bg-[#4a6b57]",
-          status === "guess" && "bg-[#9a6b12]",
-          status === "unverified" && "bg-[#8a837a]",
+          status === "fact" && "bg-[var(--lb-light)]",
+          status === "guess" && "bg-[var(--lb-structural)]",
+          status === "unverified" && "bg-[var(--to-ink-3)]",
           status === "contradicted" && "bg-load-bearing"
         )}
       />

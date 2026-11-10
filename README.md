@@ -78,6 +78,7 @@ Zod validates the model's output against this schema before anything reaches the
 
 | Layer | Choice | Why |
 | --- | --- | --- |
+| Visual system | **tiny office**'s design language | IBM Plex (Sans / Serif wordmark / Mono figures), near-white page with white cards, one hairline, one indigo accent, 8px radii, one soft shadow. Tokens transcribed from `tiny-office/src/styles/tokens.css`. |
 | UI | **shadcn/ui** (`new-york` style, Tailwind 4, CSS variables) | Card, Badge, Button, Tabs, Accordion, Textarea, Input, Skeleton, Sonner — vendored into `components/ui/`, owned by this repo. |
 | Frontend | Next.js 16 (App Router) + React 19 + Tailwind 4 | One deploy to Vercel. |
 | Graph | React Flow (`@xyflow/react`) | Interactive dependency map, layered bottom-up by hand. |
@@ -118,6 +119,28 @@ Storage is optional. Run [`supabase/schema.sql`](supabase/schema.sql) once in th
 the `analyses` table. With RLS enabled and no client policies, only the server can read or write it. If the
 Supabase host is unreachable, the app reports `"storage": "local"` from `/api/health` and keeps working on
 `localStorage` rather than failing the analysis.
+
+## Look and feel
+
+The interface follows **[tiny office](https://tiny-office-smoky.vercel.app/)** (`github.com/nttare0/tiny-office`),
+the same author's other app, so the two read as one family:
+
+- **Type** — IBM Plex throughout: Sans for the interface, **Serif for the wordmark and report titles** (regular
+  weight, never large), Mono for figures, keys and refs. The `.woff2` files and their SIL OFL licence are copied
+  into `public/fonts/`; nothing is fetched from another host.
+- **Colour** — a near-white page (`hsl(0 0% 97.5%)`) carrying pure-white cards, `hsl(240 4.9% 83.9%)` hairlines,
+  and a single accent: indigo `hsl(243.4 75.4% 58.6%)`. Load-Bearing adds colour for exactly one reason — the
+  three bands (load-bearing / structural / light partition) and the four status labels — each with a soft tint
+  for badge fills. Everything else is one of three greys.
+- **Shape** — `0.5rem` radii, one 1px border, one shallow shadow (`0 1px 0.125rem hsl(240 3.8% 46.1% / 12%)`),
+  and the hover recipe from tiny office's app cards: the border turns the accent and gains a 1px accent ring.
+- **Dark mode** — transcribed from tiny office too (page darker than panels, visible 3:1 edges, lighter accent
+  with dark words on it). `.dark` on `<html>`; not yet wired to a toggle.
+
+Tiny office's own token names (`--to-bg`, `--to-surface`, `--to-ink`, `--to-accent`, `--to-radius`,
+`--to-shadow`, `--to-font-serif`…) are declared in `app/globals.css` and used directly, so its conventions read
+straight across. shadcn's component contract (`--background`, `--card`, `--primary`, `--border`, `--radius`…)
+points at those same values, which is why the vendored components work untouched.
 
 ## shadcn/ui
 

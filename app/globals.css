@@ -1,67 +1,153 @@
 @import "tailwindcss";
+@import "./theme-tokens.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/*
-  Load-Bearing visual language: a drafting board, not a dashboard.
+/* ============================================================================
+   Load-Bearing in tiny office's clothes.
 
-  The token names below are the standard shadcn/ui contract (--background,
-  --foreground, --card, --primary, --muted-foreground, --border, --ring,
-  --radius...), so every component in components/ui works untouched. The
-  values are Load-Bearing's: warm paper, ink, one structural accent.
+   The visual system is taken from tiny office (github.com/nttare0/tiny-office):
+   IBM Plex Sans for interface, Plex Serif for the wordmark, Plex Mono for keys
+   and figures; a near-white page with pure-white cards, a single hairline
+   border, one accent (indigo) and two quiet greys; 8px radii, one soft shadow;
+   colour only where it carries meaning — the same discipline tiny office uses
+   for its paper tokens.
 
-  Bands (load-bearing / structural / light) are our own addition, because a
-  claim's weight needs three colors the base palette does not carry.
-*/
+   Tiny office's own token names (--to-bg, --to-surface, --to-ink...) are
+   declared here too, so its conventions read straight across. shadcn/ui's
+   component contract (--background, --card, --primary, --border, --radius...)
+   points at those same values, which is why the vendored components in
+   components/ui need no changes at all.
+   ========================================================================= */
 
 :root {
-  --radius: 0.625rem;
+  /* --- tiny office tokens --- */
+  --to-font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --to-font-serif: "IBM Plex Serif", "Iowan Old Style", Georgia, "Noto Serif", serif;
+  --to-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --to-font-system: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
-  --background: #f7f4ed;
-  --foreground: #191713;
+  --to-bg: hsl(0 0% 97.5%);
+  --to-surface: hsl(0 0% 100%);
+  --to-surface-2: hsl(240 4.8% 95.9%);
+  --to-border: hsl(240 4.9% 83.9%);
+  --to-border-strong: hsl(240 5% 64.9%);
+  --to-ink: hsl(240 5.9% 10%);
+  --to-ink-2: hsl(240 5.3% 26.1%);
+  --to-ink-3: hsl(240 5.2% 33.9%);
+  --to-accent: hsl(243.4 75.4% 58.6%);
+  --to-accent-soft: hsl(226.5 100% 93.9%);
+  --to-on-accent: hsl(0 0% 100%);
+  --to-danger: hsl(0 72.2% 50.6%);
+  --to-success: hsl(142.1 76.2% 36.3%);
+  --to-warning: hsl(32.1 94.6% 43.7%);
+  --to-placeholder: var(--to-ink-3);
 
-  --card: #fffdf8;
-  --card-foreground: #191713;
+  --to-radius: 0.5rem;
+  --to-radius-sm: 0.375rem;
+  --to-radius-pill: 999rem;
+  --to-shadow: 0 1px 0.125rem hsl(240 3.8% 46.1% / 12%);
+  --to-shadow-pop: 0 0.25rem 1rem rgb(0 0 0 / 16%);
 
-  --popover: #fffdf8;
-  --popover-foreground: #191713;
+  --to-max-w: 67.5rem;
+  --to-gutter: 1rem;
+  --to-line: 1.5;
+  --to-line-label: 1.25;
 
-  --primary: #191713;
-  --primary-foreground: #f9f6ef;
+  /* --- Load-Bearing's three bands, expressed in tiny office's palette ---
+     The bands are a measurement, so they get colour; everything else in the
+     interface does not. Values sit beside the accent so the page has one
+     temperature, and each is legible on --to-surface (>= 4.5:1). */
+  --lb-load: hsl(0 62% 44%);
+  --lb-load-soft: hsl(0 80% 96%);
+  --lb-structural: hsl(32 82% 34%);
+  --lb-structural-soft: hsl(36 90% 95%);
+  --lb-light: hsl(163 58% 27%);
+  --lb-light-soft: hsl(160 55% 95%);
 
-  --secondary: #efeae0;
-  --secondary-foreground: #2b2823;
+  /* Status: the four labels a claim can wear. */
+  --lb-fact: hsl(152 45% 27%);
+  --lb-fact-soft: hsl(152 40% 94%);
+  --lb-guess: hsl(32 82% 32%);
+  --lb-guess-soft: hsl(38 90% 94%);
+  --lb-unverified: var(--to-ink-3);
+  --lb-unverified-soft: var(--to-surface-2);
+  --lb-contradicted: hsl(0 62% 42%);
+  --lb-contradicted-soft: hsl(0 76% 96%);
 
-  --muted: #efeae0;
-  --muted-foreground: #6b645b;
+  /* --- shadcn/ui contract, pointed at tiny office's values --- */
+  --background: var(--to-bg);
+  --foreground: var(--to-ink);
+  --card: var(--to-surface);
+  --card-foreground: var(--to-ink);
+  --popover: var(--to-surface);
+  --popover-foreground: var(--to-ink);
+  /* tiny office's primary button is the accent with white words; secondary
+     actions are the plain surface button. Those are shadcn's default and
+     outline variants respectively. */
+  --primary: var(--to-accent);
+  --primary-foreground: var(--to-on-accent);
+  --secondary: var(--to-surface-2);
+  --secondary-foreground: var(--to-ink-2);
+  --muted: var(--to-surface-2);
+  --muted-foreground: var(--to-ink-3);
+  --accent: var(--to-accent-soft);
+  --accent-foreground: var(--to-ink);
+  --destructive: var(--to-danger);
+  --destructive-foreground: var(--to-surface);
+  --border: var(--to-border);
+  --input: var(--to-border);
+  --ring: var(--to-accent);
+  --radius: var(--to-radius);
+}
 
-  --accent: #f1ece2;
-  --accent-foreground: #191713;
+.dark {
+  /* tiny office's dark theme, same ratios: page darker than panels, visible
+     edges, a lighter accent with dark words on it. */
+  --to-bg: hsl(240 6% 8%);
+  --to-surface: hsl(240 5.1% 15%);
+  --to-surface-2: hsl(240 5.7% 18.2%);
+  --to-border: hsl(240 5.3% 36%);
+  --to-border-strong: hsl(240 5% 52%);
+  --to-ink: hsl(240 9.1% 91.8%);
+  --to-ink-2: hsl(240 7.3% 84%);
+  --to-ink-3: hsl(240 5.6% 73%);
+  --to-accent: hsl(229.4 100% 78.3%);
+  --to-accent-soft: hsl(243.5 40.8% 27%);
+  --to-on-accent: hsl(240 5.9% 11%);
+  --to-danger: hsl(0 98.6% 67.9%);
+  --to-success: hsl(141.6 72.4% 55.2%);
+  --to-warning: hsl(43.3 100% 53.4%);
+  --to-shadow: 0 1px 0.125rem rgb(0 0 0 / 24%);
+  --to-shadow-pop: 0 0.25rem 1rem rgb(0 0 0 / 50%);
 
-  --destructive: #b4451f;
-  --destructive-foreground: #fffdf8;
+  --lb-load: hsl(0 84% 72%);
+  --lb-load-soft: hsl(0 40% 18%);
+  --lb-structural: hsl(38 92% 66%);
+  --lb-structural-soft: hsl(32 40% 17%);
+  --lb-light: hsl(158 52% 62%);
+  --lb-light-soft: hsl(160 30% 16%);
+  --lb-fact: hsl(152 45% 62%);
+  --lb-fact-soft: hsl(152 30% 16%);
+  --lb-guess: hsl(38 92% 66%);
+  --lb-guess-soft: hsl(32 35% 17%);
+  --lb-unverified: var(--to-ink-3);
+  --lb-unverified-soft: var(--to-surface-2);
+  --lb-contradicted: hsl(0 84% 70%);
+  --lb-contradicted-soft: hsl(0 35% 19%);
 
-  --border: #e2dcd0;
-  --input: #ddd6c8;
-  --ring: #b8b0a2;
-
-  /* Load-Bearing bands */
-  --load-bearing: #b4451f;
-  --structural: #9a6b12;
-  --light-partition: #4a6b57;
-
-  /* Status tints, used by badges */
-  --fact: #33503f;
-  --fact-bg: #eaf0e9;
-  --guess: #7a540e;
-  --guess-bg: #f7edd5;
-  --unverified: #5f584e;
-  --unverified-bg: #f1ede4;
-  --contradicted: #8f3417;
-  --contradicted-bg: #f8e3da;
+  --primary: var(--to-accent);
+  --primary-foreground: var(--to-on-accent);
+  --card: var(--to-surface);
+  --border: var(--to-border);
+  color-scheme: dark;
 }
 
 @theme inline {
+  --font-sans: var(--to-font);
+  --font-mono: var(--to-font-mono);
+  --font-serif: var(--to-font-serif);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -82,26 +168,30 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --color-load-bearing: var(--load-bearing);
-  --color-structural: var(--structural);
-  --color-light-partition: var(--light-partition);
+  --color-ink: var(--to-ink);
+  --color-ink-2: var(--to-ink-2);
+  --color-ink-3: var(--to-ink-3);
 
-  --color-fact: var(--fact);
-  --color-fact-bg: var(--fact-bg);
-  --color-guess: var(--guess);
-  --color-guess-bg: var(--guess-bg);
-  --color-unverified: var(--unverified);
-  --color-unverified-bg: var(--unverified-bg);
-  --color-contradicted: var(--contradicted);
-  --color-contradicted-bg: var(--contradicted-bg);
+  --color-load-bearing: var(--lb-load);
+  --color-load-bearing-soft: var(--lb-load-soft);
+  --color-structural: var(--lb-structural);
+  --color-structural-soft: var(--lb-structural-soft);
+  --color-light-partition: var(--lb-light);
+  --color-light-partition-soft: var(--lb-light-soft);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-fact: var(--lb-fact);
+  --color-fact-soft: var(--lb-fact-soft);
+  --color-guess: var(--lb-guess);
+  --color-guess-soft: var(--lb-guess-soft);
+  --color-unverified: var(--lb-unverified);
+  --color-unverified-soft: var(--lb-unverified-soft);
+  --color-contradicted: var(--lb-contradicted);
+  --color-contradicted-soft: var(--lb-contradicted-soft);
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
 }
 
 @layer base {
@@ -111,50 +201,111 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    font-size: 100%;
   }
 
   body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "cv11", "ss01";
-    /* A faint drafting grid, barely there. */
-    background-image:
-      linear-gradient(to right, rgba(25, 23, 19, 0.032) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(25, 23, 19, 0.032) 1px, transparent 1px);
-    background-size: 28px 28px;
+    margin: 0;
+    font: 1rem / var(--to-line) var(--to-font);
+    color: var(--to-ink);
+    background: var(--to-bg);
+    font-feature-settings: "cv05", "ss01";
+    -webkit-font-smoothing: antialiased;
   }
 
-  ::selection {
-    background: #f0d8c8;
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--to-font-mono);
   }
 
   h1,
   h2,
-  h3 {
-    letter-spacing: -0.02em;
+  h3,
+  h4 {
+    letter-spacing: -0.01em;
+    line-height: var(--to-line-label);
+  }
+
+  /* One focus ring everywhere, the accent's, as tiny office does. */
+  :focus-visible {
+    outline: 2px solid var(--to-accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--to-accent-soft);
+    color: var(--to-ink);
   }
 }
 
 @layer utilities {
-  .font-mono-tight {
-    font-family: var(--font-mono);
+  /* The wordmark: Plex Serif, regular weight, never large (tiny office's
+     header rule: "don't make it so big"). */
+  .lb-wordmark {
+    font-family: var(--to-font-serif);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+
+  /* Figures and keys: Plex Mono with tabular numerals. */
+  .lb-mono {
+    font-family: var(--to-font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
   }
 
-  .shadow-card {
+  /* The card: a light surface, a hairline, a corner, a quiet shadow — the
+     exact recipe from tiny office's .to-app-open. */
+  .lb-surface {
+    background: var(--to-surface);
+    border: 1px solid var(--to-border);
+    border-radius: var(--to-radius);
+    box-shadow: var(--to-shadow);
+  }
+
+  /* Hover/focus on anything that behaves like one of tiny office's cards. */
+  .lb-interactive {
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s,
+      background-color 0.15s;
+  }
+  .lb-interactive:hover {
+    border-color: var(--to-accent);
     box-shadow:
-      0 1px 0 rgba(25, 23, 19, 0.04),
-      0 8px 24px -18px rgba(25, 23, 19, 0.45);
+      0 0 0 1px var(--to-accent),
+      var(--to-shadow);
+  }
+
+  .lb-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--to-ink-3);
+    line-height: var(--to-line-label);
+  }
+
+  .lb-hint {
+    color: var(--to-ink-3);
+    font-size: 0.9em;
+  }
+
+  .lb-rule {
+    border-color: var(--to-border);
   }
 
   .animate-rise {
-    animation: rise 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+    animation: lb-rise 200ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
   }
 
-  @keyframes rise {
+  @keyframes lb-rise {
     from {
       opacity: 0;
-      transform: translateY(6px);
+      transform: translateY(4px);
     }
     to {
       opacity: 1;
@@ -166,17 +317,28 @@
     .animate-rise {
       animation: none;
     }
+    .lb-interactive {
+      transition: none;
+    }
   }
 }
 
-/* React Flow inherits the paper theme. */
+/* React Flow, in the same greys. */
 .react-flow__attribution {
   display: none;
 }
 .react-flow__edge-path {
-  stroke: #8a837a;
-  stroke-width: 1.5;
+  stroke: var(--to-border-strong);
+  stroke-width: 1.25;
 }
 .react-flow__handle {
   opacity: 0;
+}
+.react-flow__controls button {
+  background: var(--to-surface);
+  border-color: var(--to-border);
+  color: var(--to-ink-2);
+}
+.react-flow__controls button:hover {
+  background: var(--to-surface-2);
 }
