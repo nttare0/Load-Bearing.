@@ -14,5 +14,5 @@ export function SharedReport({ analysis }: { analysis: Analysis }) {
     toast("This is a shared, read-only report.");
   }, []);
 
-  return <Report analysis={analysis} persisted onDelete={undefined} onOutcome={noop} />;
+  return <Report analysis={analysis} persisted readOnly onDelete={undefined} onOutcome={noop} />;
 }

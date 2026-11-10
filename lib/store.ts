@@ -131,6 +131,14 @@ export async function deleteAnalysis(id: string): Promise<boolean> {
 /** Marks an assumption as tested and records what actually happened (v3). */
 export type TestOutcome = "confirmed" | "broken" | "inconclusive";
 
+/**
+ * Record what the user found. The outcome is written onto the claim, so it
+ * survives a save, a reload and a shared link — the whole point of testing a
+ * claim is that someone else can see the result.
+ *
+ * A recorded result also settles the claim's status, because the user checked
+ * it themselves: that is the only path to "fact" that does not need a URL.
+ */
 export async function recordOutcome(
   id: string,
   ref: string,
@@ -139,23 +147,22 @@ export async function recordOutcome(
   const analysis = await loadAnalysis(id);
   if (!analysis) return null;
 
+  const now = new Date().toISOString();
   const claims = analysis.claims.map((claim) =>
     claim.ref === ref
       ? {
           ...claim,
-          // A confirmed test is the only way an assumption becomes a fact:
-          // the user checked it themselves, so there is no URL requirement.
           status: (outcome === "confirmed"
             ? "fact"
             : outcome === "broken"
               ? "contradicted"
               : claim.status) as typeof claim.status,
-          outcome,
+          outcome: { result: outcome, at: now },
         }
       : claim
   );
 
-  const updated = { ...analysis, claims } as Analysis;
+  const updated = { ...analysis, claims, updatedAt: now } as Analysis;
   const saved = await saveAnalysis(updated);
   return saved ? updated : null;
 }

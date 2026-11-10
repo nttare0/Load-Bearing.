@@ -14,12 +14,13 @@ import type { Claim } from "@/lib/schema";
 type Props = {
   claim: Claim;
   claims: Claim[];
-  outcome?: "confirmed" | "broken" | "inconclusive";
   onOutcome?: (ref: string, outcome: "confirmed" | "broken" | "inconclusive") => void;
   canRecord?: boolean;
 };
 
-export function ClaimCard({ claim, claims, outcome, onOutcome, canRecord }: Props) {
+export function ClaimCard({ claim, claims, onOutcome, canRecord }: Props) {
+  // The result lives on the claim, so a shared link shows it too.
+  const outcome = claim.outcome?.result;
   const [open, setOpen] = useState(false);
   const dependencies = claim.dependsOn
     .map((ref) => claims.find((c) => c.ref === ref))
@@ -43,6 +44,15 @@ export function ClaimCard({ claim, claims, outcome, onOutcome, canRecord }: Prop
           {outcome === "confirmed" && <Badge variant="fact">tested · holds</Badge>}
           {outcome === "broken" && <Badge variant="contradicted">tested · broken</Badge>}
           {outcome === "inconclusive" && <Badge variant="unverified">tested · unclear</Badge>}
+          {claim.outcome && (
+            <time
+              dateTime={claim.outcome.at}
+              className="lb-mono text-[0.6875rem] text-ink-3"
+              title={new Date(claim.outcome.at).toLocaleString()}
+            >
+              {new Date(claim.outcome.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </time>
+          )}
         </div>
 
         <div className="flex items-start gap-3">

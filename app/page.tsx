@@ -35,7 +35,6 @@ export default function Home() {
   const [persisted, setPersisted] = useState(false);
   const [storage, setStorage] = useState<"supabase" | "local">("local");
   const [history, setHistory] = useState<StoredHistory[]>([]);
-  const [outcomes, setOutcomes] = useState<Record<string, "confirmed" | "broken" | "inconclusive">>({});
   const resultsRef = useRef<HTMLDivElement>(null);
 
   // Restore the last analysis, per the plan's localStorage-first approach.
@@ -88,7 +87,6 @@ export default function Home() {
       setAnalysis(null);
       setClaims([]);
       setFailureModes([]);
-      setOutcomes({});
       setStage("extract");
       setDetail("Reading the plan and quoting the claims it states.");
       setPersisted(false);
@@ -192,12 +190,37 @@ export default function Home() {
 
   const recordOutcome = useCallback(
     async (ref: string, outcome: "confirmed" | "broken" | "inconclusive") => {
-      setOutcomes((prev) => ({ ...prev, [ref]: outcome }));
+      if (!analysis) return;
 
-      if (!analysis || !persisted) {
+      // The result is written onto the claim itself, so the badge, the
+      // "what you learned" panel, the export and the shared link all read the
+      // same field instead of a parallel map that only this tab knows about.
+      const stamp = new Date().toISOString();
+      const next: Analysis = {
+        ...analysis,
+        updatedAt: stamp,
+        claims: analysis.claims.map((c) =>
+          c.ref === ref
+            ? {
+                ...c,
+                status: outcome === "confirmed" ? "fact" : outcome === "broken" ? "contradicted" : c.status,
+                outcome: { result: outcome, at: stamp },
+              }
+            : c
+        ),
+      };
+
+      setAnalysis(next);
+      setClaims(next.claims);
+
+      if (!persisted) {
+        // No server copy to write to, so keep it with the local one —
+        // otherwise a reload throws away the only thing the user earned.
+        remember(next, false);
         toast.success("Marked as tested on this device.");
         return;
       }
+
       try {
         const response = await fetch("/api/analysis", {
           method: "POST",
@@ -208,15 +231,17 @@ export default function Home() {
         if (data.analysis) {
           setAnalysis(data.analysis);
           setClaims(data.analysis.claims);
-          toast.success("Outcome saved. The plan now knows what was tested.");
+          remember(data.analysis, true);
+          toast.success("Saved. Anyone with the link sees what you found.");
         } else {
-          toast.error(data.error ?? "Could not save the outcome.");
+          // The optimistic write stays on screen; say plainly it did not land.
+          toast.error(data.error ?? "The result is on this device only — storage did not take it.");
         }
       } catch {
-        toast.error("Could not reach storage. The mark is local only.");
+        toast.error("Could not reach storage. The result is on this device only.");
       }
     },
-    [analysis, persisted]
+    [analysis, persisted, remember]
   );
 
   const remove = useCallback(async () => {
@@ -232,7 +257,6 @@ export default function Home() {
     setAnalysis(null);
     setClaims([]);
     setFailureModes([]);
-    setOutcomes({});
     setStage(null);
     setPersisted(false);
     setHistory(readHistory().filter((h) => h.id !== analysis.id));
@@ -349,7 +373,6 @@ export default function Home() {
             persisted={persisted}
             onDelete={remove}
             onOutcome={recordOutcome}
-            outcomes={outcomes}
           />
         ) : (
           !busy &&
