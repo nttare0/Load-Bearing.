@@ -48,15 +48,17 @@ export async function GET() {
 
   try {
     analysis = await runPipeline(SAMPLE, (event: PipelineEvent) => {
+      // Every stage event marks a boundary: the previous stage ended here and
+      // this one begins. An error carries the stage it came from.
+      if (event.type === "error") {
+        stageErrors.push({ stage: lastStage as StageError["stage"], message: event.message });
+        return;
+      }
       if (event.type !== "stage") return;
       const now = Date.now();
       stages.push({ stage: lastStage, ms: now - lastMark });
       lastStage = event.stage;
       lastMark = now;
-      // A stage that emits an error event is a pass that threw; record where.
-      if (event.type === "stage" && event.detail && /fail|error/i.test(event.detail)) {
-        stageErrors.push({ stage: event.stage, message: event.detail });
-      }
     });
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error);
@@ -81,8 +83,12 @@ export async function GET() {
   const scored = claims.filter((claim) => typeof claim.priority === "number");
   const cited = claims.filter((claim) => (claim.evidence?.length ?? 0) > 0);
 
+  const everyFactCited = claims.every((claim) => claim.status !== "fact" || (claim.evidence?.length ?? 0) > 0);
+
   return Response.json({
-    ok: claims.length > 0 && scored.length > 0,
+    // Passing means claims came back, they were scored, and nothing claiming to
+    // be a fact went without a citation. The third is the whole point of the app.
+    ok: claims.length > 0 && scored.length > 0 && everyFactCited,
     ...providerInfo,
     ms: Date.now() - started,
     stages,
