@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Download, FileJson, FileText, Link as LinkIcon, Share2, Trash2 } from "lucide-react";
+import { Download, FileJson, FileText, Link as LinkIcon, RotateCw, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { ClaimCard } from "@/components/ClaimCard";
 import { DependencyGraph } from "@/components/DependencyGraph";
 import { PriorityChart } from "@/components/PriorityChart";
 import { ProgressPanel } from "@/components/ProgressPanel";
+import { RunDiff } from "@/components/RunDiff";
 import { StatusBadge } from "@/components/ConfidenceBadge";
 import { toJson, toMarkdown } from "@/lib/export";
 import { downloadPdf } from "@/lib/pdf";
@@ -26,9 +27,23 @@ type Props = {
   readOnly?: boolean;
   onDelete?: () => void;
   onOutcome?: (ref: string, outcome: "confirmed" | "broken" | "inconclusive") => void;
+  /** The previous run of the same plan, when there is one to compare against. */
+  previous?: Analysis;
+  /** Re-run this plan's latest text. Absent on a shared report. */
+  onRerun?: () => void;
+  rerunBusy?: boolean;
 };
 
-export function Report({ analysis, persisted, readOnly = false, onDelete, onOutcome }: Props) {
+export function Report({
+  analysis,
+  persisted,
+  readOnly = false,
+  onDelete,
+  onOutcome,
+  previous,
+  onRerun,
+  rerunBusy = false,
+}: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [tab, setTab] = useState("ranked");
 
@@ -127,6 +142,12 @@ export function Report({ analysis, persisted, readOnly = false, onDelete, onOutc
               <Button variant="outline" size="sm" onClick={copyShareLink}>
                 <Share2 className="h-3.5 w-3.5" /> Share
               </Button>
+              {onRerun && !readOnly && (
+                <Button variant="outline" size="sm" onClick={onRerun} disabled={rerunBusy}>
+                  {rerunBusy ? <RotateCw className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5" />}
+                  Run again
+                </Button>
+              )}
               {onDelete && (
                 <Button variant="ghost" size="sm" onClick={onDelete} aria-label="Delete this analysis">
                   <Trash2 className="h-3.5 w-3.5" />
@@ -167,6 +188,12 @@ export function Report({ analysis, persisted, readOnly = false, onDelete, onOutc
               <li key={note}>— {note}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {previous && (
+        <div className="flex flex-col gap-[0.5rem]">
+          <RunDiff base={previous} latest={analysis} />
         </div>
       )}
 

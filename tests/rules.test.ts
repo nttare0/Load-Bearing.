@@ -122,3 +122,112 @@ test("coverage is derived, so it cannot drift from the claims", () => {
   assert.equal(p.coverage, 0.25);
   assert.equal(p.isEmpty, false);
 });
+
+// ---------------------------------------------------------------------------
+// Re-runs: the same assumption must be recognised across two analyses, or the
+// diff reports noise as progress.
+// ---------------------------------------------------------------------------
+
+import { assignKeys, claimKey, diffRuns, diffVerdict } from "../lib/diff";
+import { previousRun, recordRun, type Plan } from "../lib/plans";
+
+test("the same assumption is keyed the same way however it is worded", () => {
+  const a = claimKey("Founders will pay for a clearer view of their assumptions.");
+  const b = claimKey("founders pay for clearer view of their assumptions");
+  assert.equal(a, b);
+  assert.notEqual(a, claimKey("Founders will not pay for this."));
+});
+
+test("a re-run inherits the test result of the assumption it repeats", () => {
+  const first = claim({ status: "fact", outcome: { result: "confirmed", at: "2026-11-01T10:00:00Z" } });
+  const second = claim({ id: "i2", ref: "C1", status: "guess", claim: "Founders will pay for a clearer view of their assumptions." });
+  const [merged] = assignKeys([second], { claims: [first] });
+  assert.equal(merged.outcome?.result, "confirmed");
+  assert.equal(merged.status, "fact");
+});
+
+test("a diff separates what settled from what never moved", () => {
+  const base: Analysis = {
+    ...analysis([
+      claim({ ref: "C1", priority: 10, status: "fact", outcome: { result: "confirmed", at: "2026-11-01T10:00:00Z" } }),
+      claim({ ref: "C2", id: "i2", priority: 6, claim: "The app store listing alone drives installs." }),
+    ]),
+    run: 1,
+  };
+  const latest: Analysis = {
+    ...analysis([
+      claim({ ref: "C1", priority: 10, status: "fact", outcome: { result: "confirmed", at: "2026-11-08T10:00:00Z" } }),
+      claim({ ref: "C2", id: "i2", priority: 6, claim: "The app store listing alone drives installs." }),
+    ]),
+    run: 2,
+  };
+  const diff = diffRuns(base, latest);
+  assert.equal(diff.counts.settled, 1);
+  assert.equal(diff.counts.unchanged, 1);
+  assert.equal(diff.counts.new, 0);
+  assert.match(diffVerdict(diff), /1 settled by a test/);
+});
+
+test("a run where nothing moved says so instead of implying progress", () => {
+  const claims = [claim({ ref: "C1", priority: 8 }), claim({ ref: "C2", id: "i2", priority: 5, claim: "Store listing drives installs." })];
+  const diff = diffRuns(analysis(claims), analysis(claims));
+  assert.equal(diff.counts.unchanged, 2);
+  assert.match(diffVerdict(diff), /^Nothing moved\./);
+});
+
+test("a claim the new run no longer makes is reported as gone", () => {
+  const base = analysis([claim({ ref: "C1" }), claim({ ref: "C2", id: "i2", claim: "Store listing drives installs." })]);
+  const latest = analysis([claim({ ref: "C1" })]);
+  const diff = diffRuns(base, latest);
+  assert.equal(diff.counts.dropped, 1);
+  assert.equal(diff.claims.find((d) => d.movement === "dropped")?.claim.ref, "C2");
+});
+
+test("recording a second run keeps one plan, not two", () => {
+  const first = { ...analysis([claim()]), id: "run-1", planId: "plan-1", run: 1 };
+  const { plans, plan, isRerun } = recordRun([], first, "the plan text");
+  assert.equal(plans.length, 1);
+  assert.equal(isRerun, false);
+
+  const second = { ...analysis([claim()]), id: "run-2", planId: "plan-1", run: 2 };
+  const after = recordRun(plans, second, "the plan text");
+  assert.equal(after.plans.length, 1);
+  assert.equal(after.plan.runs.length, 2);
+  assert.equal(after.isRerun, true);
+  assert.equal(after.plans[0].id, plan.id);
+});
+
+test("re-pasting the same plan is the same plan even after a reload", () => {
+  const first = { ...analysis([claim()]), id: "run-1" };
+  const { plans } = recordRun([], first, "  A budgeting app for freelancers. ");
+  const second = { ...analysis([claim()]), id: "run-2" };
+  const after = recordRun(plans, second, "A budgeting app for freelancers.");
+  assert.equal(after.plans.length, 1);
+  assert.equal(after.plan.runs.length, 2);
+});
+
+test("the previous run is found by position, and the first run has none", () => {
+  const first = { ...analysis([claim()]), id: "run-1" };
+  const second = { ...analysis([claim()]), id: "run-2" };
+  const { plans } = recordRun([], first, "plan");
+  const { plan } = recordRun(plans, second, "plan");
+  const store = { "run-1": first, "run-2": second };
+  assert.equal(previousRun(plan, store, "run-2")?.id, "run-1");
+  assert.equal(previousRun(plan, store, "run-1"), undefined);
+  assert.equal(previousRun(undefined, store, "run-1"), undefined);
+});
+
+test("a plan whose stored analysis was forgotten still resolves by position", () => {
+  const plan: Plan = {
+    id: "p",
+    text: "plan",
+    title: "t",
+    createdAt: "2026-11-01T00:00:00Z",
+    updatedAt: "2026-11-02T00:00:00Z",
+    runs: [
+      { analysisId: "gone", at: "2026-11-01T00:00:00Z", claims: 3 },
+      { analysisId: "here", at: "2026-11-02T00:00:00Z", claims: 3 },
+    ],
+  };
+  assert.equal(previousRun(plan, { here: { ...analysis([claim()]), id: "here" } }, "here"), undefined);
+});

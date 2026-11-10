@@ -18,13 +18,23 @@ import type { Message } from "@/lib/workspace";
 export function Thread({
   messages,
   analyses,
+  prevOf,
+  planOf,
   onOutcome,
   onDeleteReport,
+  onRerun,
+  busy,
 }: {
   messages: Message[];
   analyses: Record<string, Analysis>;
+  /** The earlier run of the same plan, for the diff. */
+  prevOf: (analysisId: string) => Analysis | undefined;
+  /** The plan a report belongs to, so "run again" knows what to run. */
+  planOf: (analysisId: string) => string | undefined;
   onOutcome: (analysisId: string, ref: string, outcome: "confirmed" | "broken" | "inconclusive") => void;
   onDeleteReport: (analysisId: string) => void;
+  onRerun: (planId: string) => void;
+  busy: boolean;
 }) {
   return (
     <div className="flex flex-col gap-[1.5rem]">
@@ -91,6 +101,9 @@ export function Thread({
                 <Report
                   analysis={analysis}
                   persisted
+                  previous={prevOf(analysis.id)}
+                  onRerun={planOf(analysis.id) ? () => onRerun(planOf(analysis.id)!) : undefined}
+                  rerunBusy={busy}
                   onOutcome={(ref, outcome) => onOutcome(analysis.id, ref, outcome)}
                   onDelete={() => onDeleteReport(analysis.id)}
                 />

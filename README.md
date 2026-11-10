@@ -189,6 +189,34 @@ Install again with the registry, unchanged:
 npx shadcn@latest add @bklit/bar-chart   # after adding "@bklit": "https://ui.bklit.com/r/{name}.json"
 ```
 
+## A plan, and its runs
+
+A report used to be the end of the road: analyse, read, act, forget. A plan is
+the durable thing; a run is one reading of it. So the same plan analysed again
+is not a second report — it is a comparison.
+
+**Claims carry a stable key** (`lib/diff.ts`): their statement, normalised so
+wording changes ("Founders will pay for a clearer view…" / "founders pay for
+clearer view…") land on the same key. When a later run produces a claim with the
+same key, it is the same assumption being read again, not a new one — and it
+**inherits its test result**. Re-running never throws away work you already did.
+
+**The diff leads with what moved,** and only that:
+
+- *Settled* — a test result arrived since the last run
+- *Moved* — same assumption, different band or weight
+- *New* / *Gone* — this run added or dropped it
+- unchanged claims are counted and hidden behind "Show all", because a diff that
+  flags everything is a diff nobody reads
+
+If nothing moved, it says so: **"Nothing moved. All 7 assumptions are exactly as
+unproven as they were last run."** That is the most useful sentence the app can
+produce, and the least flattering.
+
+Plans live in `lib/plans.ts` (browser storage, like workspaces). The server still
+stores single analyses and knows nothing about plan identity — a shared link
+shows one run, not a history the reader cannot verify.
+
 ## One workspace, one thread
 
 The page is a workspace, not a form. The left rail lists workspaces; the middle
@@ -262,6 +290,8 @@ app/
   api/health            which capabilities are actually configured
 lib/
   workspace.ts          workspaces, threads and their storage
+  plans.ts              a plan and its runs, so re-analysis can be compared
+  diff.ts               stable claim keys + what moved between two runs
   progress.ts           what the recorded tests actually settled (derived)
   prompts.ts            the five pass prompts + the rubric in prose
   schema.ts             Zod claim schemas + pipeline event types
@@ -277,6 +307,7 @@ components/
   ClaimCard             one claim, its quote, its evidence, its test
   DependencyGraph       React Flow map, layered by dependency depth
   PriorityChart         the ranking, drawn with Bklit's bar chart
+  RunDiff               what moved since the previous run of this plan
   ProgressPanel         "what you learned" — coverage, broken claims, verdict
   Report                tabs, counts, exports, pre-mortem
   PlanInput             paste / upload / URL

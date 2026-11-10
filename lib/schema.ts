@@ -112,6 +112,11 @@ export const ClaimSchema = RawClaimSchema.extend({
   test: TestSchema.omit({ ref: true }).nullable(),
   /** Absent means "not tested yet" — never a false negative for shared reads. */
   outcome: OutcomeRecordSchema.optional(),
+  /**
+   * Normalised statement, stable across re-runs of the same plan. Set by the
+   * dashboard when a claim enters a run; absent on older stored reports.
+   */
+  key: z.string().optional(),
 });
 
 export const AnalysisSchema = z.object({
@@ -121,6 +126,13 @@ export const AnalysisSchema = z.object({
   createdAt: z.string(),
   /** Bumped on every write so re-stored reports stay ordered. */
   updatedAt: z.string().optional(),
+  /**
+   * Groups the runs of one plan. A re-run of the same plan carries the same id,
+   * which is what makes a diff possible.
+   */
+  planId: z.string().optional(),
+  /** 1 for the first analysis of a plan, 2 for the next, and so on. */
+  run: z.number().int().min(1).optional(),
   input: z.string(),
   claims: z.array(ClaimSchema),
   failureModes: PreMortemOutputSchema.shape.failureModes,
