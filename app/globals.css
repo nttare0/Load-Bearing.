@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/*
+  Load-Bearing visual language: drafting-board, not dashboard.
+  Warm paper, ink, a single structural accent. The graph and the cards share
+  the same grid so the two views feel like one document.
+*/
+
+@theme {
+  --color-paper: #f7f4ed;
+  --color-paper-raised: #fffdf8;
+  --color-ink: #191713;
+  --color-ink-soft: #55504a;
+  --color-ink-faint: #8a837a;
+  --color-rule: #e2dcd0;
+  --color-load: #b4451f;
+  --color-structural: #9a6b12;
+  --color-light: #4a6b57;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+  --radius-card: 0.75rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-rule);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-feature-settings: "cv11", "ss01";
+    /* A faint drafting grid, barely there. */
+    background-image:
+      linear-gradient(to right, rgba(25, 23, 19, 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(25, 23, 19, 0.035) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  ::selection {
+    background: #f0d8c8;
+  }
+
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .font-mono-tight {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .shadow-card {
+    box-shadow:
+      0 1px 0 rgba(25, 23, 19, 0.04),
+      0 8px 24px -18px rgba(25, 23, 19, 0.45);
+  }
+
+  .animate-rise {
+    animation: rise 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-rise {
+      animation: none;
+    }
+  }
+}
+
+/* React Flow inherits the paper theme. */
+.react-flow__attribution {
+  display: none;
+}
+.react-flow__edge-path {
+  stroke: var(--color-ink-faint);
+  stroke-width: 1.5;
+}
+.react-flow__handle {
+  opacity: 0;
+}
