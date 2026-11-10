@@ -189,6 +189,41 @@ Install again with the registry, unchanged:
 npx shadcn@latest add @bklit/bar-chart   # after adding "@bklit": "https://ui.bklit.com/r/{name}.json"
 ```
 
+## Testing a claim closes the loop
+
+A report is the start, not the answer. Every claim already carries the cheapest
+test that could kill it, with a stated *stop if* condition — so the app treats
+that condition as a commitment rather than a suggestion.
+
+When you run the test, record what happened (**Holds / Broken / Unclear**). The
+result is written onto the claim itself, which means:
+
+- **It travels.** A shared link shows `tested · broken` and the date. Before this,
+  marks lived in one browser's state, so whoever you sent the link to saw an
+  untested report.
+- **It is summarised, not buried.** *What you learned* sits at the top of the
+  report and in every export: how many claims are settled, and — if anything
+  broke — the broken claims named, each beside the stop condition you wrote.
+- **The verdict is honest about incompleteness.** Nothing tested says so. A clean
+  run that still leaves load-bearing claims unchecked says that too, rather than
+  congratulating you.
+- **The graph agrees.** Untested nodes are dashed; tested nodes carry their result.
+
+The summary is derived from the claims every time (`lib/progress.ts`), never
+stored, so the owner's view, the shared link and the Markdown export cannot
+disagree.
+
+## Tests
+
+```bash
+npm test        # node:test via tsx — 8 tests, no test framework dependency
+```
+
+They cover the two rules that would make this app dishonest if they broke: a
+claim cannot be called a fact without an evidence URL, and a report cannot hide
+what the user found. Plus the band thresholds and the ranking's cleanup of
+dangling dependencies.
+
 ## Project layout
 
 ```
@@ -200,6 +235,7 @@ app/
   api/extract           PDF, DOCX, Markdown, text and URL extraction
   api/health            which capabilities are actually configured
 lib/
+  progress.ts           what the recorded tests actually settled (derived)
   prompts.ts            the five pass prompts + the rubric in prose
   schema.ts             Zod claim schemas + pipeline event types
   score.ts              the rubric in code: priority, bands, reconciliation
@@ -211,9 +247,11 @@ components/
   ClaimCard             one claim, its quote, its evidence, its test
   DependencyGraph       React Flow map, layered by dependency depth
   PriorityChart         the ranking, drawn with Bklit's bar chart
+  ProgressPanel         "what you learned" — coverage, broken claims, verdict
   Report                tabs, counts, exports, pre-mortem
   PlanInput             paste / upload / URL
   charts/               Bklit UI, vendored (see Charts)
+tests/rules.test.ts     the honesty rules, as tests
 supabase/schema.sql     the one table
 ```
 

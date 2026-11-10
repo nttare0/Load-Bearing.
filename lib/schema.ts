@@ -90,6 +90,19 @@ export const TestDesignOutputSchema = z.object({
 });
 
 /** A claim after server-side enforcement + enrichment. */
+/**
+ * What the user found when they ran the cheapest test. Recording one is the
+ * only way an assumption stops being an assumption, so it travels with the
+ * claim itself — and therefore with the shared link.
+ */
+export const OUTCOMES = ["confirmed", "broken", "inconclusive"] as const;
+
+export const OutcomeRecordSchema = z.object({
+  result: z.enum(OUTCOMES),
+  /** ISO timestamp, set when the outcome is recorded. */
+  at: z.string(),
+});
+
 export const ClaimSchema = RawClaimSchema.extend({
   id: z.string().min(1),
   rank: z.number().int().min(1),
@@ -97,6 +110,8 @@ export const ClaimSchema = RawClaimSchema.extend({
   priority: z.number().min(1).max(10),
   evidence: z.array(EvidenceItemSchema),
   test: TestSchema.omit({ ref: true }).nullable(),
+  /** Absent means "not tested yet" — never a false negative for shared reads. */
+  outcome: OutcomeRecordSchema.optional(),
 });
 
 export const AnalysisSchema = z.object({
@@ -104,6 +119,8 @@ export const AnalysisSchema = z.object({
   title: z.string().min(1),
   summary: z.string(),
   createdAt: z.string(),
+  /** Bumped on every write so re-stored reports stay ordered. */
+  updatedAt: z.string().optional(),
   input: z.string(),
   claims: z.array(ClaimSchema),
   failureModes: PreMortemOutputSchema.shape.failureModes,
@@ -113,6 +130,8 @@ export const AnalysisSchema = z.object({
 export type Category = (typeof CATEGORIES)[number];
 export type Status = (typeof STATUSES)[number];
 export type Confidence = (typeof CONFIDENCES)[number];
+export type Outcome = (typeof OUTCOMES)[number];
+export type OutcomeRecord = z.infer<typeof OutcomeRecordSchema>;
 export type RawClaim = z.infer<typeof RawClaimSchema>;
 export type Test = z.infer<typeof TestSchema>;
 export type EvidenceItem = z.infer<typeof EvidenceItemSchema>;

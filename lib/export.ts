@@ -1,5 +1,6 @@
 import type { Analysis, Claim } from "./schema";
 import { bandLabel } from "./score";
+import { progressOf, verdict } from "./progress";
 
 /**
  * Markdown is the primary export: it survives pasting into Notion, Slack, a
@@ -23,6 +24,23 @@ export function toMarkdown(analysis: Analysis): string {
   lines.push("");
   lines.push(analysis.summary);
   lines.push("");
+  // What the tests settled goes above the claims: someone reading the export
+  // should not have to reach the end to learn that a load-bearing claim broke.
+  const progress = progressOf(analysis);
+  if (!progress.isEmpty) {
+    lines.push("## What you learned");
+    lines.push("");
+    lines.push(verdict(progress));
+    lines.push("");
+    lines.push(
+      `- Tested: ${progress.tested} of ${progress.total} (${progress.confirmed} hold, ${progress.broken} broken, ${progress.inconclusive} unclear)`
+    );
+    if (progress.untested.length) {
+      lines.push(`- Untested: ${progress.untested.map((c) => c.ref).join(", ")}`);
+    }
+    lines.push("");
+  }
+
   lines.push("## The claims it rests on");
   lines.push("");
 
@@ -34,6 +52,14 @@ export function toMarkdown(analysis: Analysis): string {
     );
     lines.push(`- Category: ${claim.category}`);
     lines.push(`- Status: ${claim.status}`);
+    if (claim.outcome) {
+      const when = new Date(claim.outcome.at).toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+      lines.push(`- Tested ${when}: **${claim.outcome.result}**`);
+    }
     lines.push(
       `- Source: ${
         claim.source === "implied" ? "_implied — never stated in the plan_" : `“${claim.source}”`

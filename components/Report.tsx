@@ -11,23 +11,40 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ClaimCard } from "@/components/ClaimCard";
 import { DependencyGraph } from "@/components/DependencyGraph";
 import { PriorityChart } from "@/components/PriorityChart";
+import { ProgressPanel } from "@/components/ProgressPanel";
 import { StatusBadge } from "@/components/ConfidenceBadge";
 import { toJson, toMarkdown } from "@/lib/export";
 import { downloadPdf } from "@/lib/pdf";
 import { bandLabel } from "@/lib/score";
-import type { Analysis } from "@/lib/schema";
+import type { Analysis, Claim } from "@/lib/schema";
 import { cn } from "@/lib/utils";
 
 type Props = {
   analysis: Analysis;
   persisted: boolean;
+  /** Someone else's report: results are visible, actions belong to the owner. */
+  readOnly?: boolean;
   onDelete?: () => void;
   onOutcome?: (ref: string, outcome: "confirmed" | "broken" | "inconclusive") => void;
-  outcomes?: Record<string, "confirmed" | "broken" | "inconclusive">;
 };
 
-export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {} }: Props) {
+export function Report({ analysis, persisted, readOnly = false, onDelete, onOutcome }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [tab, setTab] = useState("ranked");
+
+  /**
+   * Clicking a claim in the graph should take you to the claim. The old
+   * handler ran a querySelector and threw the result away, so nothing moved.
+   */
+  const focusClaim = useCallback((claim: Claim) => {
+    setTab("ranked");
+    // The cards mount with the tab, so wait a frame before scrolling.
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`claim-${claim.ref}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, []);
 
   const counts = useMemo(() => {
     const c = { load: 0, structural: 0, light: 0, fact: 0, guess: 0, unverified: 0, contradicted: 0 };
@@ -153,7 +170,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
         </div>
       )}
 
-      <Tabs defaultValue="ranked">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList variant="line">
           <TabsTrigger value="ranked">Ranked list</TabsTrigger>
           <TabsTrigger value="graph">Dependency map</TabsTrigger>
@@ -163,26 +180,22 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
 
         <TabsContent value="ranked" className="flex flex-col gap-[0.75rem]">
           <p className="lb-hint text-[0.75rem]">Ranked by impact × uncertainty.</p>
+          <ProgressPanel analysis={analysis} />
           <PriorityChart claims={analysis.claims} />
           {analysis.claims.map((claim) => (
-            <ClaimCard
-              key={claim.id}
-              claim={claim}
-              claims={analysis.claims}
-              outcome={outcomes[claim.ref]}
-              onOutcome={onOutcome}
-              canRecord={persisted}
-            />
+            <div key={claim.id} id={`claim-${claim.ref}`}>
+              <ClaimCard
+                claim={claim}
+                claims={analysis.claims}
+                onOutcome={onOutcome}
+                canRecord={persisted}
+              />
+            </div>
           ))}
         </TabsContent>
 
         <TabsContent value="graph">
-          <DependencyGraph
-            claims={analysis.claims}
-            onFocus={(_claim) => {
-              document.querySelector('[data-state="inactive"][value="ranked"]');
-            }}
-          />
+          <DependencyGraph claims={analysis.claims} onFocus={focusClaim} />
         </TabsContent>
 
         <TabsContent value="premortem" className="flex flex-col gap-3">
@@ -249,7 +262,11 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
       </Tabs>
 
       <p className="border-t border-border pt-[0.75rem] text-[0.75rem] leading-[1.5] text-ink-3">
-        {persisted ? "Saved. Delete it any time." : "On this device only."}
+        {readOnly
+          ? "Shared report. Test results are the owner's, and they update here."
+          : persisted
+            ? "Saved. Delete it any time."
+            : "On this device only."}
       </p>
     </div>
   );

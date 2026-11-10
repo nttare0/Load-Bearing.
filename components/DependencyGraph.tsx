@@ -39,7 +39,11 @@ function ClaimNode({ data }: NodeProps) {
       className={cn(
         "lb-hover-ring w-[13.5rem] cursor-pointer rounded-[var(--to-radius)] border border-border bg-transparent px-[0.625rem] py-[0.5rem] text-left"
       )}
-      style={{ borderTop: `2px solid ${accent}` }}
+      style={{
+        borderTop: `2px solid ${accent}`,
+        // An untested claim looks provisional on purpose; a tested one is solid.
+        borderStyle: claim.outcome ? "solid" : "dashed",
+      }}
     >
       <Handle type="target" position={Position.Top} />
       <div className="flex items-center justify-between gap-2">
@@ -50,7 +54,7 @@ function ClaimNode({ data }: NodeProps) {
           className="rounded-full px-[0.375em] py-[0.0625em] text-[0.625rem] font-semibold uppercase tracking-[0.04em]"
           style={{ background: "var(--to-surface-2)", color: accent }}
         >
-          {claim.status}
+          {claim.outcome ? claim.outcome.result : "untested"}
         </span>
       </div>
       <p className="mt-[0.25rem] line-clamp-3 text-[0.8125rem] leading-[1.4] font-medium text-foreground">{claim.claim}</p>
