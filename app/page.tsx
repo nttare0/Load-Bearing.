@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowUpRight, Database, History, Loader2 } from "lucide-react";
+import { AlertTriangle, Database, History, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { PlanInput } from "@/components/PlanInput";
 import { Report, StatusLegend } from "@/components/Report";
@@ -270,128 +270,117 @@ export default function Home() {
   const started = busy || claims.length > 0 || Boolean(analysis);
 
   return (
-    <div className="min-h-dvh">
-      {/* The header is nav, not document: wordmark in Plex Serif at the column
-          edge, one plain action at the other end, a hairline under it. */}
-      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-sm">
-        <div className="mx-auto flex h-14 w-full max-w-[var(--to-max-w)] items-center justify-between gap-4 px-4 sm:px-6">
-          <a href="/" className="lb-wordmark flex items-center gap-2 text-[1.25rem] text-foreground no-underline">
+    <div className="flex min-h-dvh flex-col">
+      {/* Nav, not document: the wordmark in Plex Serif at the column's edge,
+          one plain action at the other end, a hairline under it. */}
+      <header className="to-header sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-sm">
+        <div className="to-column flex h-[var(--to-header-h)] items-center justify-between gap-[var(--to-gutter)]">
+          <a href="/" className="lb-wordmark flex items-center gap-[0.5em] text-[1.375rem] text-foreground no-underline">
             <BeamMark />
             Load-Bearing
           </a>
-          <div className="flex items-center gap-1">
-            <a
-              href="#how"
-              className="flex h-9 items-center gap-1.5 rounded-[var(--to-radius-sm)] px-2.5 text-[0.8125rem] text-muted-foreground no-underline transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              How it works <ArrowUpRight className="h-3.5 w-3.5" />
-            </a>
+          <div className="flex items-center gap-[0.375em]">
+            <Button variant="ghost" size="sm" asChild>
+              <a href="#how" className="no-underline">
+                How it works
+              </a>
+            </Button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-[var(--to-max-w)] flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-2.5">
-          <h1 className="max-w-3xl text-[1.5rem] leading-[1.2] font-semibold tracking-[-0.01em] text-foreground sm:text-[1.875rem]">
-            Find the assumptions your plan quietly depends on.
+      <main className="to-column flex flex-1 flex-col gap-[1.5rem] py-[1.5rem]">
+        <div className="flex flex-col gap-[0.75rem]">
+          <h1 className="max-w-[42rem] text-[1.5rem] leading-[1.15] font-semibold tracking-[-0.02em] sm:text-[1.875rem]">
+            Find the assumptions your plan depends on.
           </h1>
-          <p className="max-w-2xl text-[0.9375rem] leading-[var(--to-line)] text-ink-2">
-            In a building, the load-bearing wall is the one holding up everything above it. Plans work the same way:
-            a few claims carry most of the weight, and most of them are never written down. Paste a plan and this
-            ranks those claims by how much collapses if they are wrong — then gives you the cheapest way to check.
+          <p className="max-w-[38rem] text-[0.9375rem] leading-[1.6] text-ink-2">
+            A few claims carry a plan. Most of them are never written down, so nobody checks them until
+            something collapses.
           </p>
           <StatusLegend />
         </div>
-      </div>
 
-      <PlanInput onSubmit={run} busy={busy} />
+        <PlanInput onSubmit={run} busy={busy} />
 
-      {history.length > 0 && !started && (
-        <Card className="gap-3 rounded-[var(--to-radius)] border-border py-4 shadow-[var(--to-shadow)]">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-[13px]">
-              <History className="h-3.5 w-3.5 text-muted-foreground" /> Recent on this device
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-1">
-            {history.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => void loadHistory(item.id)}
-                className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent cursor-pointer"
-              >
-                <span className="truncate text-[13px] text-foreground">{item.title}</span>
-                <span className="shrink-0 text-[11px] text-muted-foreground">
-                  {item.claims} claims · {new Date(item.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                </span>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      <div ref={resultsRef} />
-
-      {error && (
-        <div className="flex items-start gap-3 rounded-lg border border-[var(--lb-load)]/30 bg-[var(--lb-load-soft)] px-4 py-3">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--lb-load)]" />
-          <div className="flex flex-col gap-1">
-            <p className="text-[13px] font-medium text-[var(--lb-load)]">That run did not finish</p>
-            <p className="text-[12.5px] leading-relaxed text-[var(--to-ink-2)]">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {busy && !analysis && <Progress stage={stage} detail={detail} claims={claims} />}
-
-      {analysis ? (
-        <Report
-          analysis={analysis}
-          persisted={persisted}
-          onDelete={remove}
-          onOutcome={recordOutcome}
-          outcomes={outcomes}
-        />
-      ) : (
-        !busy &&
-        claims.length === 0 &&
-        !error && (
-          <section id="how" className="grid gap-3 sm:grid-cols-3">
-            {[
-              {
-                title: "It quotes, it does not paraphrase",
-                body: "Every claim carries either a verbatim line from your plan or the word “implied”. You can see exactly what you actually said.",
-              },
-              {
-                title: "Ranked by what collapses",
-                body: "Impact × uncertainty, on a fixed rubric. Two scoring runs, and disagreement is shown rather than smoothed over.",
-              },
-              {
-                title: "Tested before it is built",
-                body: "Each top claim gets the cheapest disproof, with the number that means proceed and the number that means stop.",
-              },
-            ].map((item) => (
-              <Card key={item.title} className="lb-interactive gap-2 rounded-[var(--to-radius)] border-border bg-card py-4 shadow-[var(--to-shadow)]">
-                <CardHeader>
-                  <CardTitle className="text-[13.5px]">{item.title}</CardTitle>
-                  <CardDescription className="text-[12.5px]">{item.body}</CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
+        {history.length > 0 && !started && (
+          <section className="flex flex-col gap-[0.5rem]">
+            <h2 className="to-head3 flex items-center gap-[0.5em]">
+              <History className="size-3.5" /> Recent
+            </h2>
+            <ul className="flex flex-col">
+              {history.map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => void loadHistory(item.id)}
+                    className="flex w-full items-center justify-between gap-[1em] rounded-[var(--to-radius-sm)] px-[0.5em] py-[0.5em] text-left transition-colors hover:bg-[var(--to-accent-soft)]"
+                  >
+                    <span className="truncate text-[0.875rem] text-foreground">{item.title}</span>
+                    <span className="lb-mono shrink-0 text-[0.75rem] text-ink-3">
+                      {item.claims} · {new Date(item.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </section>
-        )
-      )}
+        )}
 
-      <footer className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-[11px] text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <Database className="h-3 w-3" />
-          {storage === "supabase"
-            ? "Storage connected — analyses you keep are saved, and you can delete them."
-            : "Storage is local to your browser until a database is connected."}
-        </span>
-        <span>No accounts. No tracking. A fact label needs a URL.</span>
-      </footer>
+        <div ref={resultsRef} />
+
+        {error && (
+          <div
+            role="alert"
+            className="flex items-start gap-[0.5em] rounded-[var(--to-radius)] border border-[var(--lb-load)] bg-[var(--lb-load-soft)] px-[0.75em] py-[0.5em]"
+          >
+            <AlertTriangle className="mt-[0.15em] size-4 shrink-0 text-[var(--lb-load)]" />
+            <div className="flex flex-col gap-[0.25em]">
+              <p className="text-[0.875rem] font-semibold text-[var(--lb-load)]">That run did not finish</p>
+              <p className="text-[0.875rem] leading-[1.5] text-ink-2">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {busy && !analysis && <Progress stage={stage} detail={detail} claims={claims} />}
+
+        {analysis ? (
+          <Report
+            analysis={analysis}
+            persisted={persisted}
+            onDelete={remove}
+            onOutcome={recordOutcome}
+            outcomes={outcomes}
+          />
+        ) : (
+          !busy &&
+          claims.length === 0 &&
+          !error && (
+            <section id="how" className="flex flex-col gap-[0.75rem] border-t border-border pt-[1.25rem]">
+              <h2 className="to-head3">How it reads a plan</h2>
+              <ol className="grid gap-[0.75rem] sm:grid-cols-3">
+                {[
+                  { title: "Quotes, never paraphrases", body: "Every claim carries a line from your plan, or the word implied." },
+                  { title: "Ranked by what collapses", body: "Impact × uncertainty, on a fixed rubric, scored twice." },
+                  { title: "Tested before it is built", body: "The cheapest disproof, with the number that means stop." },
+                ].map((item, i) => (
+                  <li key={item.title} className="lb-surface flex flex-col gap-[0.375rem] p-[0.875rem]">
+                    <span className="lb-mono text-[0.6875rem] text-ink-3">0{i + 1}</span>
+                    <span className="text-[0.875rem] font-semibold leading-[1.3]">{item.title}</span>
+                    <span className="text-[0.875rem] leading-[1.5] text-ink-2">{item.body}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )
+        )}
+
+        <footer className="mt-auto flex flex-wrap items-center justify-between gap-[0.5em] border-t border-border pt-[0.75rem] text-[0.75rem] text-ink-3">
+          <span className="flex items-center gap-[0.375em]">
+            <Database className="size-3" />
+            {storage === "supabase" ? "Saved reports available" : "Stored on this device only"}
+          </span>
+          <span>No accounts. No tracking.</span>
+        </footer>
       </main>
     </div>
   );
@@ -432,7 +421,7 @@ function Progress({
         <CardContent className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin text-load-bearing" />
-            <p className="text-[13px] font-medium">{detail || "Reading the plan…"}</p>
+            <p className="text-[0.875rem] font-medium">{detail || "Reading the plan…"}</p>
           </div>
           <ol className="flex flex-col gap-1.5">
             {STAGES.map((item, i) => {
@@ -467,9 +456,7 @@ function Progress({
 
       {claims.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="px-1 text-[11px] text-muted-foreground">
-            Claims are arriving. Sorted once scoring finishes.
-          </p>
+          <p className="lb-hint text-[0.75rem]">Arriving. Sorted once scoring finishes.</p>
           {claims.slice(0, 3).map((claim) => (
             <Card key={claim.id} className="animate-rise gap-3 rounded-[var(--to-radius)] border-border py-4 shadow-[var(--to-shadow)]">
               <CardContent className="flex flex-col gap-2">

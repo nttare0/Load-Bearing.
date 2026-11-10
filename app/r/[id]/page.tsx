@@ -12,14 +12,20 @@ export default async function SharedAnalysis({ params }: { params: Promise<{ id:
   if (!analysis) notFound();
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10 sm:px-6">
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-[15px] font-semibold tracking-tight">Load-Bearing</span>
-        <Link href="/" className="text-[12px] text-muted-foreground underline underline-offset-4 hover:text-foreground">
-          Check your own plan
-        </Link>
-      </div>
-      <SharedReport analysis={analysis} />
-    </main>
+    <div className="flex min-h-dvh flex-col">
+      <header className="border-b border-border">
+        <div className="to-column flex h-[var(--to-header-h)] items-center justify-between gap-[var(--to-gutter)]">
+          <Link href="/" className="lb-wordmark flex items-center gap-[0.5em] text-[1.375rem] text-foreground no-underline">
+            Load-Bearing
+          </Link>
+          <Link href="/" className="text-[0.8125rem] text-[var(--to-accent)] underline-offset-4 hover:underline">
+            Check your own plan
+          </Link>
+        </div>
+      </header>
+      <main className="to-column flex flex-1 flex-col gap-[1.5rem] py-[1.5rem]">
+        <SharedReport analysis={analysis} />
+      </main>
+    </div>
   );
 }

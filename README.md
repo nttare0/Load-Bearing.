@@ -134,6 +134,14 @@ the same author's other app, so the two read as one family:
   for badge fills. Everything else is one of three greys.
 - **Shape** — `0.5rem` radii, one 1px border, one shallow shadow (`0 1px 0.125rem hsl(240 3.8% 46.1% / 12%)`),
   and the hover recipe from tiny office's app cards: the border turns the accent and gains a 1px accent ring.
+- **Layout** — tiny office's column: `--to-max-w` (67.5rem) with `--to-gutter` insets, shared by the header and
+  the body so the wordmark stands on the first letter of the first card. A `3.5rem` nav bar with a hairline under
+  it; section headings set the way its drawer headings are (0.75rem, semibold, tracked out, quiet grey).
+- **Type scale** — rem/em only, no px sizes, as tiny office's `test/stylesheets.test.ts` enforces across its own
+  sheets: 0.6875–0.75rem for labels and figures, 0.8125rem body in cards, 0.9375rem for the plan input and
+  summaries, 1.375–1.875rem for the wordmark and page title.
+- **Voice** — labels, not paragraphs. The interface explains itself with short headings ("The plan", "Ranked by
+  impact × uncertainty", "First sign") rather than sentences of guidance; the legend is the four badges alone.
 - **Dark mode** — transcribed from tiny office too (page darker than panels, visible 3:1 edges, lighter accent
   with dark words on it). `.dark` on `<html>`; not yet wired to a toggle.
 

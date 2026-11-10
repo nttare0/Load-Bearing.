@@ -51,6 +51,10 @@
 
   --to-max-w: 67.5rem;
   --to-gutter: 1rem;
+  --to-touch: 2.75rem;
+  /* The header's height: nav furniture, three and a half of the touch target's
+     em, exactly as tiny office sets --to-header-h. */
+  --to-header-h: 3.5rem;
   --to-line: 1.5;
   --to-line-label: 1.25;
 
@@ -281,6 +285,34 @@
   }
 
   .lb-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--to-ink-3);
+    line-height: var(--to-line-label);
+  }
+
+  /* The column: one measure, its insets from the window's edge, shared by the
+     header and the body so the wordmark stands on the first letter of the
+     first card below it (tiny office's --to-col-inset-*). */
+  .to-column {
+    width: 100%;
+    max-width: var(--to-max-w);
+    margin-inline: auto;
+    padding-inline: var(--to-gutter);
+  }
+
+  @media (min-width: 40rem) {
+    .to-column {
+      padding-inline: calc(var(--to-gutter) * 1.5);
+    }
+  }
+
+  /* A section's heading, as tiny office sets its drawer headings: small,
+     semibold, tracked out, the quiet grey. */
+  .to-head3 {
+    margin: 0;
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;

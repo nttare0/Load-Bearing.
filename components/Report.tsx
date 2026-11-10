@@ -75,7 +75,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
     try {
       if (!persisted) {
         await navigator.clipboard.writeText(markdown);
-        toast.success("Report copied as Markdown — share links need storage, so the full text is on your clipboard.");
+        toast.success("Report copied. Share links need storage, so the text went to the clipboard.");
         return;
       }
       await navigator.clipboard.writeText(`${window.location.origin}/r/${analysis.id}`);
@@ -86,16 +86,13 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
   }, [analysis.id, markdown, persisted]);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[1rem]">
       <Card className="gap-0 overflow-hidden rounded-[var(--to-radius)] border-border py-0 shadow-[var(--to-shadow)]">
-        <div className="flex flex-col gap-4 p-6">
+        <div className="flex flex-col gap-[0.75rem] p-[1rem]">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="lb-label text-[0.6875rem] text-[var(--lb-load)]">
-                Load-Bearing report
-              </p>
-              <h2 className="lb-wordmark mt-1.5 text-[1.375rem] leading-[1.2] sm:text-[1.625rem]">{analysis.title}</h2>
-              <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-muted-foreground">
+              <h2 className="lb-wordmark text-[1.375rem] leading-[1.2] sm:text-[1.625rem]">{analysis.title}</h2>
+              <p className="mt-[0.5rem] max-w-[38rem] text-[0.9375rem] leading-[1.6] text-ink-2">
                 {analysis.summary}
               </p>
             </div>
@@ -120,7 +117,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3 text-[12px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-[0.5em] border-t border-border pt-[0.75rem] text-[0.75rem] text-ink-3">
             <Badge variant="load">{counts.load} load-bearing</Badge>
             <Badge variant="structural">{counts.structural} structural</Badge>
             <Badge variant="light">{counts.light} light</Badge>
@@ -138,18 +135,16 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
             )}
             <span className="ml-auto flex items-center gap-1.5">
               <LinkIcon className="h-3 w-3" />
-              {persisted ? "saved to your account" : "on this device only"}
+              {persisted ? "saved" : "this device"}
             </span>
           </div>
         </div>
       </Card>
 
       {analysis.notes.length > 0 && (
-        <div className="rounded-lg border border-[var(--lb-structural)]/25 bg-[var(--lb-structural-soft)]/60 px-4 py-3">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--lb-structural)]">
-            About this run
-          </p>
-          <ul className="mt-1.5 flex flex-col gap-1 text-[12.5px] leading-relaxed text-[var(--to-ink-2)]">
+        <div className="rounded-[var(--to-radius)] border border-[var(--lb-structural)]/40 bg-[var(--lb-structural-soft)] px-[0.75rem] py-[0.5rem]">
+          <p className="lb-label text-[0.6875rem] text-[var(--lb-structural)]">Notes</p>
+          <ul className="mt-[0.375rem] flex flex-col gap-[0.25rem] text-[0.8125rem] leading-[1.5] text-ink-2">
             {analysis.notes.map((note) => (
               <li key={note}>— {note}</li>
             ))}
@@ -165,10 +160,8 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
           <TabsTrigger value="markdown">Report text</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ranked" className="flex flex-col gap-3">
-          <p className="px-1 text-[12px] text-muted-foreground">
-            Sorted by impact × uncertainty. The top of this list is what you should check before writing code.
-          </p>
+        <TabsContent value="ranked" className="flex flex-col gap-[0.75rem]">
+          <p className="lb-hint text-[0.75rem]">Ranked by impact × uncertainty.</p>
           {analysis.claims.map((claim) => (
             <ClaimCard
               key={claim.id}
@@ -192,12 +185,12 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
 
         <TabsContent value="premortem" className="flex flex-col gap-3">
           {analysis.failureModes.length === 0 ? (
-            <p className="text-[13px] text-muted-foreground">No pre-mortem was generated for this run.</p>
+            <p className="lb-hint text-[0.875rem]">No pre-mortem for this run.</p>
           ) : (
             analysis.failureModes.map((mode, i) => {
               const claim = analysis.claims.find((c) => c.ref === mode.claimRef);
               return (
-                <Card key={`${mode.claimRef}-${i}`} className="gap-3 rounded-[var(--to-radius)] border-border py-4 shadow-[var(--to-shadow)]">
+                <Card key={`${mode.claimRef}-${i}`} className="gap-[0.5rem] rounded-[var(--to-radius)] border-border py-[0.875rem] shadow-[var(--to-shadow)]">
                   <CardHeader>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
@@ -222,8 +215,8 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-[12.5px] text-muted-foreground">
-                      <span className="font-medium text-foreground">First sign: </span>
+                    <p className="text-[0.8125rem] text-ink-2">
+                      <span className="font-semibold text-foreground">First sign </span>
                       {mode.earlyWarning}
                     </p>
                   </CardContent>
@@ -235,7 +228,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
 
         <TabsContent value="markdown">
           <div className="relative">
-            <pre className="max-h-[560px] overflow-auto rounded-lg border border-border bg-background-raised p-4 font-mono text-[11.5px] leading-relaxed text-muted-foreground whitespace-pre-wrap">
+            <pre className="lb-mono max-h-[32rem] overflow-auto rounded-[var(--to-radius)] border border-border bg-[var(--to-surface-2)] p-[0.75rem] text-[0.75rem] leading-[1.6] text-ink-2 whitespace-pre-wrap">
               {markdown}
             </pre>
             <Button
@@ -253,16 +246,9 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
         </TabsContent>
       </Tabs>
 
-      <div className="flex flex-col gap-1 border-t border-border pt-4 text-[11.5px] leading-relaxed text-muted-foreground">
-        <p>
-          A claim marked <span className="text-muted-foreground">fact</span> or{" "}
-          <span className="text-muted-foreground">contradicted</span> has a URL behind it. Everything else is unverified —
-          that is the point of the label.
-        </p>
-        <p>
-          Plans are not stored unless you ask. {persisted ? "This one is saved; delete it any time with the bin icon." : "This one lives in your browser only."}
-        </p>
-      </div>
+      <p className="border-t border-border pt-[0.75rem] text-[0.75rem] leading-[1.5] text-ink-3">
+        {persisted ? "Saved. Delete it any time." : "On this device only."}
+      </p>
     </div>
   );
 }
@@ -279,19 +265,10 @@ function slug(title: string): string {
 
 /** Small helper so the empty state and the report share one status vocabulary. */
 export function StatusLegend() {
-  const items = [
-    { status: "fact" as const, text: "You can point at a source." },
-    { status: "guess" as const, text: "The author asserts it, nothing backs it." },
-    { status: "unverified" as const, text: "Checkable, nobody has checked." },
-    { status: "contradicted" as const, text: "Something on the record says otherwise." },
-  ];
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-      {items.map((item) => (
-        <span key={item.status} className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-          <StatusBadge status={item.status} />
-          {item.text}
-        </span>
+    <div className="flex flex-wrap items-center gap-[0.375em]">
+      {(["fact", "guess", "unverified", "contradicted"] as const).map((status) => (
+        <StatusBadge key={status} status={status} />
       ))}
     </div>
   );
