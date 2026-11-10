@@ -1,5 +1,6 @@
 import { describeProvider, provider } from "@/lib/ai";
-import { geminiKey, generate } from "@/lib/gemini";
+import { geminiKey, generate, generateStructured } from "@/lib/gemini";
+import { z } from "zod";
 import { storageMode } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -20,6 +21,18 @@ export const maxDuration = 30;
 export async function GET(request: Request) {
   const ai = describeProvider();
   const check = new URL(request.url).searchParams.get("check");
+
+  // `check=schema` exercises the path the five passes actually use: a JSON
+  // reply constrained to a Zod schema. A prose ping does not prove that works.
+  if (check === "schema" && ai.provider === "gemini") {
+    return Response.json({
+      ok: true,
+      ...ai,
+      storage: await storageMode(),
+      check: await checkGeminiSchema(),
+      time: new Date().toISOString(),
+    });
+  }
 
   if (check && ai.ai === "configured") {
     return Response.json({
@@ -55,6 +68,20 @@ async function checkGemini(): Promise<{ ran: boolean; ok: boolean; ms: number; e
   } catch (error) {
     // The message is Google's own text, which is what makes a 401 or an
     // unsupported-key-type failure actionable.
+    const message = error instanceof Error ? error.message : String(error);
+    return { ran: true, ok: false, ms: Date.now() - started, error: clean(message) };
+  }
+}
+
+async function checkGeminiSchema(): Promise<{ ran: boolean; ok: boolean; ms: number; text?: string; error?: string }> {
+  const started = Date.now();
+  try {
+    const result = await generateStructured(
+      z.object({ verdict: z.enum(["ok", "not-ok"]), word: z.string() }),
+      { user: 'Answer with verdict "ok" and word "ok".', maxTokens: 512, temperature: 0 }
+    );
+    return { ran: true, ok: result.data.verdict === "ok", ms: Date.now() - started, text: JSON.stringify(result.data) };
+  } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ran: true, ok: false, ms: Date.now() - started, error: clean(message) };
   }
