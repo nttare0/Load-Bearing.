@@ -1,29 +1,112 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
-  Load-Bearing visual language: drafting-board, not dashboard.
-  Warm paper, ink, a single structural accent. The graph and the cards share
-  the same grid so the two views feel like one document.
+  Load-Bearing visual language: a drafting board, not a dashboard.
+
+  The token names below are the standard shadcn/ui contract (--background,
+  --foreground, --card, --primary, --muted-foreground, --border, --ring,
+  --radius...), so every component in components/ui works untouched. The
+  values are Load-Bearing's: warm paper, ink, one structural accent.
+
+  Bands (load-bearing / structural / light) are our own addition, because a
+  claim's weight needs three colors the base palette does not carry.
 */
 
-@theme {
-  --color-paper: #f7f4ed;
-  --color-paper-raised: #fffdf8;
-  --color-ink: #191713;
-  --color-ink-soft: #55504a;
-  --color-ink-faint: #8a837a;
-  --color-rule: #e2dcd0;
-  --color-load: #b4451f;
-  --color-structural: #9a6b12;
-  --color-light: #4a6b57;
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
-  --radius-card: 0.75rem;
+:root {
+  --radius: 0.625rem;
+
+  --background: #f7f4ed;
+  --foreground: #191713;
+
+  --card: #fffdf8;
+  --card-foreground: #191713;
+
+  --popover: #fffdf8;
+  --popover-foreground: #191713;
+
+  --primary: #191713;
+  --primary-foreground: #f9f6ef;
+
+  --secondary: #efeae0;
+  --secondary-foreground: #2b2823;
+
+  --muted: #efeae0;
+  --muted-foreground: #6b645b;
+
+  --accent: #f1ece2;
+  --accent-foreground: #191713;
+
+  --destructive: #b4451f;
+  --destructive-foreground: #fffdf8;
+
+  --border: #e2dcd0;
+  --input: #ddd6c8;
+  --ring: #b8b0a2;
+
+  /* Load-Bearing bands */
+  --load-bearing: #b4451f;
+  --structural: #9a6b12;
+  --light-partition: #4a6b57;
+
+  /* Status tints, used by badges */
+  --fact: #33503f;
+  --fact-bg: #eaf0e9;
+  --guess: #7a540e;
+  --guess-bg: #f7edd5;
+  --unverified: #5f584e;
+  --unverified-bg: #f1ede4;
+  --contradicted: #8f3417;
+  --contradicted-bg: #f8e3da;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-load-bearing: var(--load-bearing);
+  --color-structural: var(--structural);
+  --color-light-partition: var(--light-partition);
+
+  --color-fact: var(--fact);
+  --color-fact-bg: var(--fact-bg);
+  --color-guess: var(--guess);
+  --color-guess-bg: var(--guess-bg);
+  --color-unverified: var(--unverified);
+  --color-unverified-bg: var(--unverified-bg);
+  --color-contradicted: var(--contradicted);
+  --color-contradicted-bg: var(--contradicted-bg);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
 }
 
 @layer base {
   * {
-    border-color: var(--color-rule);
+    @apply border-border outline-ring/50;
   }
 
   html {
@@ -31,13 +114,12 @@
   }
 
   body {
-    background-color: var(--color-paper);
-    color: var(--color-ink);
+    @apply bg-background text-foreground;
     font-feature-settings: "cv11", "ss01";
     /* A faint drafting grid, barely there. */
     background-image:
-      linear-gradient(to right, rgba(25, 23, 19, 0.035) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(25, 23, 19, 0.035) 1px, transparent 1px);
+      linear-gradient(to right, rgba(25, 23, 19, 0.032) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(25, 23, 19, 0.032) 1px, transparent 1px);
     background-size: 28px 28px;
   }
 
@@ -45,7 +127,9 @@
     background: #f0d8c8;
   }
 
-  h1, h2, h3 {
+  h1,
+  h2,
+  h3 {
     letter-spacing: -0.02em;
   }
 }
@@ -90,7 +174,7 @@
   display: none;
 }
 .react-flow__edge-path {
-  stroke: var(--color-ink-faint);
+  stroke: #8a837a;
   stroke-width: 1.5;
 }
 .react-flow__handle {

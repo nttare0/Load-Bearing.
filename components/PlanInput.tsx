@@ -4,8 +4,8 @@ import { useRef, useState } from "react";
 import { FileUp, Link2, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DEMO_PLAN_TEXT } from "@/lib/demo";
@@ -108,10 +108,10 @@ export function PlanInput({ onSubmit, busy }: Props) {
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="gap-0 overflow-hidden py-0 shadow-card">
       <div className="flex flex-col gap-3 p-5">
         <div className="flex items-center justify-between gap-3">
-          <label htmlFor="plan" className="text-[12px] font-medium uppercase tracking-[0.12em] text-ink-faint">
+          <label htmlFor="plan" className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
             The plan
           </label>
           <div className="flex items-center gap-1">
@@ -165,21 +165,21 @@ export function PlanInput({ onSubmit, busy }: Props) {
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-ink-faint">Try:</span>
+            <span className="text-[11px] text-muted-foreground">Try:</span>
             {EXAMPLES.map((example) => (
               <button
                 key={example.label}
                 type="button"
                 onClick={() => setText(example.text)}
                 disabled={busy}
-                className="rounded-full border border-rule bg-paper px-2.5 py-1 text-[11.5px] text-ink-soft transition-colors hover:border-ink/25 hover:text-ink cursor-pointer disabled:opacity-50"
+                className="rounded-full border border-border bg-background px-2.5 py-1 text-[11.5px] text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground cursor-pointer disabled:opacity-50"
               >
                 {example.label}
               </button>
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink-soft">
+            <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-muted-foreground">
               <input
                 type="checkbox"
                 checked={persist}
@@ -189,10 +189,10 @@ export function PlanInput({ onSubmit, busy }: Props) {
               />
               Keep this analysis
             </label>
-            <span className={chars > 0 && !ready ? "text-[11px] text-[#96391b]" : "text-[11px] text-ink-faint"}>
+            <span className={chars > 0 && !ready ? "text-[11px] text-[#96391b]" : "text-[11px] text-muted-foreground"}>
               {chars.toLocaleString()} chars
             </span>
-            <Button onClick={submit} disabled={!ready || busy} size="md">
+            <Button onClick={submit} disabled={!ready || busy} size="default">
               {busy ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" /> Working
@@ -206,8 +206,8 @@ export function PlanInput({ onSubmit, busy }: Props) {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-rule pt-3 text-[11px] text-ink-faint">
-          <Badge tone="outline">⌘/Ctrl + Enter</Badge>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3 text-[11px] text-muted-foreground">
+          <Badge variant="outline">⌘/Ctrl + Enter</Badge>
           <span>Your plan is sent to the AI provider to be read. It is not stored unless you tick “Keep this analysis”.</span>
         </div>
       </div>

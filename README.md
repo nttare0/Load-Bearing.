@@ -78,6 +78,7 @@ Zod validates the model's output against this schema before anything reaches the
 
 | Layer | Choice | Why |
 | --- | --- | --- |
+| UI | **shadcn/ui** (`new-york` style, Tailwind 4, CSS variables) | Card, Badge, Button, Tabs, Accordion, Textarea, Input, Skeleton, Sonner — vendored into `components/ui/`, owned by this repo. |
 | Frontend | Next.js 16 (App Router) + React 19 + Tailwind 4 | One deploy to Vercel. |
 | Graph | React Flow (`@xyflow/react`) | Interactive dependency map, layered bottom-up by hand. |
 | Backend | Next.js route handlers, streaming SSE | `/api/analyze` runs the passes and streams claims as they validate. |
@@ -117,6 +118,26 @@ Storage is optional. Run [`supabase/schema.sql`](supabase/schema.sql) once in th
 the `analyses` table. With RLS enabled and no client policies, only the server can read or write it. If the
 Supabase host is unreachable, the app reports `"storage": "local"` from `/api/health` and keeps working on
 `localStorage` rather than failing the analysis.
+
+## shadcn/ui
+
+Components come from [shadcn/ui](https://ui.shadcn.com/) — the `new-york` style on Tailwind 4 with CSS variables.
+They are **vendored source, not a dependency**: `components/ui/*` are the upstream files (fetched from
+`shadcn-ui/ui` at `apps/v4/registry/new-york-v4/ui`), with one deliberate change each: `cn` imports from
+`@/lib/utils`, and `Badge` gains Load-Bearing variants (`fact`, `guess`, `unverified`, `contradicted`, `load`,
+`structural`, `light`).
+
+Add more the normal way:
+
+```bash
+npx shadcn@latest add dialog dropdown-menu   # any registry item
+```
+
+`components.json` wires the CLI to this project (`css: app/globals.css`, `utils: @/lib/utils`, `ui: @/components/ui`).
+The theme lives in `app/globals.css` under the standard `--background / --foreground / --card / --primary /
+--muted-foreground / --border / --ring / --radius` contract, which is why upstream components work untouched.
+Load-Bearing keeps its own ink-on-paper palette in those slots, plus three band colours for
+load-bearing / structural / light partitions.
 
 ## Project layout
 

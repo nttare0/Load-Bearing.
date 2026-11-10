@@ -15,7 +15,7 @@ import { toJson, toMarkdown } from "@/lib/export";
 import { downloadPdf } from "@/lib/pdf";
 import { bandLabel } from "@/lib/score";
 import type { Analysis } from "@/lib/schema";
-import { cn } from "@/components/ui/utils";
+import { cn } from "@/lib/utils";
 
 type Props = {
   analysis: Analysis;
@@ -87,15 +87,15 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
 
   return (
     <div className="flex flex-col gap-5">
-      <Card className="overflow-hidden">
+      <Card className="gap-0 overflow-hidden py-0 shadow-card">
         <div className="flex flex-col gap-4 p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#b4451f]">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-load-bearing">
                 Load-Bearing report
               </p>
               <h2 className="mt-1.5 text-xl font-semibold leading-tight sm:text-2xl">{analysis.title}</h2>
-              <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-ink-soft">
+              <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-muted-foreground">
                 {analysis.summary}
               </p>
             </div>
@@ -120,10 +120,10 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-rule pt-3 text-[12px] text-ink-faint">
-            <Badge tone="load">{counts.load} load-bearing</Badge>
-            <Badge tone="structural">{counts.structural} structural</Badge>
-            <Badge tone="light">{counts.light} light</Badge>
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3 text-[12px] text-muted-foreground">
+            <Badge variant="load">{counts.load} load-bearing</Badge>
+            <Badge variant="structural">{counts.structural} structural</Badge>
+            <Badge variant="light">{counts.light} light</Badge>
             <span className="mx-1 h-3 w-px bg-rule" aria-hidden />
             <span>{counts.fact} fact</span>
             <span>·</span>
@@ -166,7 +166,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
         </TabsList>
 
         <TabsContent value="ranked" className="flex flex-col gap-3">
-          <p className="px-1 text-[12px] text-ink-faint">
+          <p className="px-1 text-[12px] text-muted-foreground">
             Sorted by impact × uncertainty. The top of this list is what you should check before writing code.
           </p>
           {analysis.claims.map((claim) => (
@@ -192,16 +192,16 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
 
         <TabsContent value="premortem" className="flex flex-col gap-3">
           {analysis.failureModes.length === 0 ? (
-            <p className="text-[13px] text-ink-faint">No pre-mortem was generated for this run.</p>
+            <p className="text-[13px] text-muted-foreground">No pre-mortem was generated for this run.</p>
           ) : (
             analysis.failureModes.map((mode, i) => {
               const claim = analysis.claims.find((c) => c.ref === mode.claimRef);
               return (
-                <Card key={`${mode.claimRef}-${i}`}>
+                <Card key={`${mode.claimRef}-${i}`} className="gap-3 py-4 shadow-card">
                   <CardHeader>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
-                        tone={
+                        variant={
                           mode.likelihood === "high"
                             ? "contradicted"
                             : mode.likelihood === "medium"
@@ -212,7 +212,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
                         {mode.likelihood} likelihood
                       </Badge>
                       {claim && (
-                        <Badge tone="outline" className="max-w-full truncate">
+                        <Badge variant="outline" className="max-w-full truncate">
                           maps to {claim.ref}: {claim.claim}
                         </Badge>
                       )}
@@ -222,8 +222,8 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-[12.5px] text-ink-soft">
-                      <span className="font-medium text-ink">First sign: </span>
+                    <p className="text-[12.5px] text-muted-foreground">
+                      <span className="font-medium text-foreground">First sign: </span>
                       {mode.earlyWarning}
                     </p>
                   </CardContent>
@@ -235,7 +235,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
 
         <TabsContent value="markdown">
           <div className="relative">
-            <pre className="max-h-[560px] overflow-auto rounded-lg border border-rule bg-paper-raised p-4 font-mono text-[11.5px] leading-relaxed text-ink-soft whitespace-pre-wrap">
+            <pre className="max-h-[560px] overflow-auto rounded-lg border border-border bg-background-raised p-4 font-mono text-[11.5px] leading-relaxed text-muted-foreground whitespace-pre-wrap">
               {markdown}
             </pre>
             <Button
@@ -253,10 +253,10 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
         </TabsContent>
       </Tabs>
 
-      <div className="flex flex-col gap-1 border-t border-rule pt-4 text-[11.5px] leading-relaxed text-ink-faint">
+      <div className="flex flex-col gap-1 border-t border-border pt-4 text-[11.5px] leading-relaxed text-muted-foreground">
         <p>
-          A claim marked <span className="text-ink-soft">fact</span> or{" "}
-          <span className="text-ink-soft">contradicted</span> has a URL behind it. Everything else is unverified —
+          A claim marked <span className="text-muted-foreground">fact</span> or{" "}
+          <span className="text-muted-foreground">contradicted</span> has a URL behind it. Everything else is unverified —
           that is the point of the label.
         </p>
         <p>
@@ -288,7 +288,7 @@ export function StatusLegend() {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1.5">
       {items.map((item) => (
-        <span key={item.status} className="flex items-center gap-1.5 text-[11.5px] text-ink-faint">
+        <span key={item.status} className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
           <StatusBadge status={item.status} />
           {item.text}
         </span>

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,20 +19,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="light" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
         {children}
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            style: {
-              background: "#fffdf8",
-              border: "1px solid #e2dcd0",
-              color: "#191713",
-              fontSize: "13px",
-            },
-          }}
-        />
+        <Toaster position="bottom-right" />
       </body>
     </html>
   );

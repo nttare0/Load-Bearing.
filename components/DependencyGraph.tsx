@@ -14,7 +14,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Claim } from "@/lib/schema";
-import { cn } from "@/components/ui/utils";
+import { cn } from "@/lib/utils";
 
 type ClaimNodeData = {
   claim: Claim;
@@ -35,13 +35,13 @@ function ClaimNode({ data }: NodeProps) {
         if (e.key === "Enter" || e.key === " ") onFocus(claim);
       }}
       className={cn(
-        "w-[228px] cursor-pointer rounded-lg border border-rule bg-paper-raised px-3 py-2.5 text-left shadow-card transition-shadow hover:shadow-md"
+        "w-[228px] cursor-pointer rounded-lg border border-border bg-background-raised px-3 py-2.5 text-left shadow-card transition-shadow hover:shadow-md"
       )}
       style={{ borderTop: `3px solid ${accent}` }}
     >
       <Handle type="target" position={Position.Top} />
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono-tight text-[10px] text-ink-faint">
+        <span className="font-mono-tight text-[10px] text-muted-foreground">
           #{claim.rank} · {claim.ref}
         </span>
         <span
@@ -51,8 +51,8 @@ function ClaimNode({ data }: NodeProps) {
           {claim.status}
         </span>
       </div>
-      <p className="mt-1 line-clamp-3 text-[12px] leading-snug font-medium text-ink">{claim.claim}</p>
-      <p className="mt-1 text-[10px] text-ink-faint">
+      <p className="mt-1 line-clamp-3 text-[12px] leading-snug font-medium text-foreground">{claim.claim}</p>
+      <p className="mt-1 text-[10px] text-muted-foreground">
         impact {claim.impact}/5 · {claim.confidence}
       </p>
       <Handle type="source" position={Position.Bottom} />
@@ -153,7 +153,7 @@ export function DependencyGraph({
   const hasEdges = edges.length > 0;
 
   return (
-    <div className="relative h-[520px] w-full overflow-hidden rounded-[var(--radius-card)] border border-rule bg-paper-raised">
+    <div className="relative h-[520px] w-full overflow-hidden rounded-[var(--radius-card)] border border-border bg-background-raised">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -170,28 +170,28 @@ export function DependencyGraph({
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="#d8d1c4" />
         <Controls
           showInteractive={false}
-          className="!rounded-lg !border !border-rule !bg-paper-raised !shadow-none [&>button]:!border-rule [&>button]:!bg-paper-raised [&>button]:!text-ink-soft"
+          className="!rounded-lg !border !border-border !bg-background-raised !shadow-none [&>button]:!border-border [&>button]:!bg-background-raised [&>button]:!text-muted-foreground"
         />
       </ReactFlow>
 
       {!hasEdges && (
-        <p className="pointer-events-none absolute left-1/2 bottom-4 -translate-x-1/2 rounded-full border border-rule bg-paper px-3 py-1 text-[11px] text-ink-faint">
+        <p className="pointer-events-none absolute left-1/2 bottom-4 -translate-x-1/2 rounded-full border border-border bg-background px-3 py-1 text-[11px] text-muted-foreground">
           No claim depends on another yet — every node here stands alone.
         </p>
       )}
 
-      <div className="pointer-events-none absolute left-3 top-3 max-w-[220px] rounded-lg border border-rule bg-paper/90 px-3 py-2 text-[11px] leading-relaxed text-ink-soft backdrop-blur">
+      <div className="pointer-events-none absolute left-3 top-3 max-w-[220px] rounded-lg border border-border bg-background/90 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground backdrop-blur">
         Read bottom-up. A node only matters if the claim above it is true. Click a node to jump to its card.
       </div>
 
       {selected && (
-        <div className="absolute right-3 top-3 max-w-[280px] rounded-lg border border-rule bg-paper-raised p-3 text-[12px] shadow-card">
-          <p className="font-medium text-ink">{selected.claim}</p>
-          <p className="mt-1 text-ink-soft">
+        <div className="absolute right-3 top-3 max-w-[280px] rounded-lg border border-border bg-background-raised p-3 text-[12px] shadow-card">
+          <p className="font-medium text-foreground">{selected.claim}</p>
+          <p className="mt-1 text-muted-foreground">
             Impact {selected.impact}/5 · confidence {selected.confidence} · {selected.category}
           </p>
           <button
-            className="mt-2 text-[11px] text-ink underline underline-offset-2 cursor-pointer"
+            className="mt-2 text-[11px] text-foreground underline underline-offset-2 cursor-pointer"
             onClick={() => setSelected(null)}
           >
             dismiss

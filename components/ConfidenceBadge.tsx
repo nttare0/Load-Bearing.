@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { bandLabel } from "@/lib/score";
 import type { Claim, Status } from "@/lib/schema";
-import { cn } from "@/components/ui/utils";
+import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<Status, string> = {
   fact: "fact",
@@ -19,7 +19,7 @@ const STATUS_TONE = {
 
 export function StatusBadge({ status }: { status: Status }) {
   return (
-    <Badge tone={STATUS_TONE[status]}>
+    <Badge variant={STATUS_TONE[status]}>
       <span
         aria-hidden
         className={cn(
@@ -27,7 +27,7 @@ export function StatusBadge({ status }: { status: Status }) {
           status === "fact" && "bg-[#4a6b57]",
           status === "guess" && "bg-[#9a6b12]",
           status === "unverified" && "bg-[#8a837a]",
-          status === "contradicted" && "bg-[#b4451f]"
+          status === "contradicted" && "bg-load-bearing"
         )}
       />
       {STATUS_LABEL[status]}
@@ -39,7 +39,7 @@ export function StatusBadge({ status }: { status: Status }) {
 export function ScoreBadge({ claim }: { claim: Claim }) {
   const tone = claim.priority >= 8 ? "load" : claim.priority >= 5 ? "structural" : "light";
   return (
-    <Badge tone={tone} className="font-mono-tight">
+    <Badge variant={tone} className="font-mono-tight">
       {bandLabel(claim.priority)} · {claim.impact}/5 · {claim.confidence}
     </Badge>
   );
@@ -53,7 +53,7 @@ export function ImpactMeter({ impact }: { impact: number }) {
           key={n}
           className={cn(
             "h-3 w-[3px] rounded-full",
-            n <= impact ? "bg-[#b4451f]" : "bg-ink/10"
+            n <= impact ? "bg-load-bearing" : "bg-foreground/10"
           )}
         />
       ))}

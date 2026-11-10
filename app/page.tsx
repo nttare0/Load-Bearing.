@@ -279,7 +279,7 @@ export default function Home() {
           </div>
           <a
             href="#how"
-            className="flex items-center gap-1 text-[12px] text-ink-faint transition-colors hover:text-ink"
+            className="flex items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
           >
             How it works <ArrowUpRight className="h-3 w-3" />
           </a>
@@ -289,7 +289,7 @@ export default function Home() {
           <h1 className="max-w-2xl text-[28px] leading-[1.15] font-semibold tracking-tight sm:text-[36px]">
             Find the assumptions your plan quietly depends on.
           </h1>
-          <p className="max-w-2xl text-[14.5px] leading-relaxed text-ink-soft">
+          <p className="max-w-2xl text-[14.5px] leading-relaxed text-muted-foreground">
             In a building, the load-bearing wall is the one holding up everything above it. Plans work the same way:
             a few claims carry most of the weight, and most of them are never written down. Paste a plan and this
             ranks those claims by how much collapses if they are wrong — then gives you the cheapest way to check.
@@ -301,10 +301,10 @@ export default function Home() {
       <PlanInput onSubmit={run} busy={busy} />
 
       {history.length > 0 && !started && (
-        <Card>
+        <Card className="gap-3 py-4 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-[13px]">
-              <History className="h-3.5 w-3.5 text-ink-faint" /> Recent on this device
+              <History className="h-3.5 w-3.5 text-muted-foreground" /> Recent on this device
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-1">
@@ -312,10 +312,10 @@ export default function Home() {
               <button
                 key={item.id}
                 onClick={() => void loadHistory(item.id)}
-                className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-ink/5 cursor-pointer"
+                className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent cursor-pointer"
               >
-                <span className="truncate text-[13px] text-ink">{item.title}</span>
-                <span className="shrink-0 text-[11px] text-ink-faint">
+                <span className="truncate text-[13px] text-foreground">{item.title}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">
                   {item.claims} claims · {new Date(item.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                 </span>
               </button>
@@ -365,7 +365,7 @@ export default function Home() {
                 body: "Each top claim gets the cheapest disproof, with the number that means proceed and the number that means stop.",
               },
             ].map((item) => (
-              <Card key={item.title} className="bg-paper-raised/60">
+              <Card key={item.title} className="gap-2 bg-card/70 py-4 shadow-none">
                 <CardHeader>
                   <CardTitle className="text-[13.5px]">{item.title}</CardTitle>
                   <CardDescription className="text-[12.5px]">{item.body}</CardDescription>
@@ -376,7 +376,7 @@ export default function Home() {
         )
       )}
 
-      <footer className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-rule pt-4 text-[11px] text-ink-faint">
+      <footer className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <Database className="h-3 w-3" />
           {storage === "supabase"
@@ -421,9 +421,9 @@ function Progress({
   return (
     <div className="flex flex-col gap-4">
       <Card>
-        <CardContent className="flex flex-col gap-3 p-5">
+        <CardContent className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-[#b4451f]" />
+            <Loader2 className="h-4 w-4 animate-spin text-load-bearing" />
             <p className="text-[13px] font-medium">{detail || "Reading the plan…"}</p>
           </div>
           <ol className="flex flex-col gap-1.5">
@@ -434,7 +434,7 @@ function Progress({
                 <li
                   key={item.key}
                   className={`flex items-center gap-2.5 text-[12.5px] ${
-                    done ? "text-ink-faint" : active ? "text-ink" : "text-ink-faint/60"
+                    done ? "text-muted-foreground" : active ? "text-foreground" : "text-muted-foreground/60"
                   }`}
                 >
                   <span
@@ -443,13 +443,13 @@ function Progress({
                         ? "border-[#4a6b57] bg-[#eaf0e9] text-[#33503f]"
                         : active
                           ? "border-[#b4451f] bg-[#fbe8e0] text-[#96391b]"
-                          : "border-rule text-ink-faint"
+                          : "border-border text-muted-foreground"
                     }`}
                   >
                     {done ? "✓" : i + 1}
                   </span>
                   <span className="font-medium">{item.label}</span>
-                  <span className="text-ink-faint">— {item.detail}</span>
+                  <span className="text-muted-foreground">— {item.detail}</span>
                 </li>
               );
             })}
@@ -459,17 +459,17 @@ function Progress({
 
       {claims.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="px-1 text-[11px] text-ink-faint">
+          <p className="px-1 text-[11px] text-muted-foreground">
             Claims are arriving. Sorted once scoring finishes.
           </p>
           {claims.slice(0, 3).map((claim) => (
-            <Card key={claim.id} className="animate-rise">
-              <CardContent className="flex flex-col gap-2 p-4">
+            <Card key={claim.id} className="animate-rise gap-3 py-4 shadow-card">
+              <CardContent className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
-                  <Badge tone={claim.source === "implied" ? "structural" : "outline"}>
+                  <Badge variant={claim.source === "implied" ? "structural" : "outline"}>
                     {claim.source === "implied" ? "implied" : "stated"}
                   </Badge>
-                  <Badge tone="outline">{claim.category}</Badge>
+                  <Badge variant="outline">{claim.category}</Badge>
                 </div>
                 <p className="text-[13.5px] font-medium leading-snug">{claim.claim}</p>
                 <Skeleton className="h-3 w-2/3" />
