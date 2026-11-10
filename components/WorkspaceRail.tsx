@@ -69,9 +69,9 @@ export function WorkspaceRail({
       </div>
 
       <nav className="flex flex-1 flex-col gap-[0.125rem] overflow-y-auto p-[0.375rem]">
-        {workspaces.length === 0 && !collapsed && (
-          <p className="px-[0.5rem] py-[0.5rem] text-[0.8125rem] leading-[1.5] text-ink-3">
-            No workspaces yet.
+        {workspaces.length === 0 && (
+          <p className={collapsed ? "sr-only" : "px-[0.5rem] py-[0.5rem] text-[0.8125rem] leading-[1.5] text-ink-3"}>
+            No workspaces yet. One is created for you on first load.
           </p>
         )}
 
@@ -139,13 +139,18 @@ export function WorkspaceRail({
         })}
       </nav>
 
-      {!collapsed && (
-        <div className="border-t border-border p-[0.5rem]">
-          <Button variant="outline" size="sm" className="w-full justify-start gap-[0.5rem]" onClick={onCreate}>
-            <Plus className="size-3.5" /> New workspace
-          </Button>
-        </div>
-      )}
+      <div className={cn("border-t border-border p-[0.5rem]", collapsed && "flex justify-center")}>
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn("gap-[0.5rem]", collapsed ? "size-8 p-0" : "w-full justify-start")}
+          onClick={onCreate}
+          aria-label="New workspace"
+        >
+          <Plus className="size-3.5" />
+          {!collapsed && "New workspace"}
+        </Button>
+      </div>
     </aside>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PanelLeft, Plus } from "lucide-react";
+import { Code2, PanelLeft, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Composer } from "@/components/Composer";
 import { assignKeys } from "@/lib/diff";
@@ -41,7 +41,10 @@ const LS_RAIL = "load-bearing:rail-collapsed";
  * rather than a result you navigate away from.
  */
 export default function Home() {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  // Seeded optimistically so the rail always has a workspace in it. The values
+  // are replaced from storage in the effect below; ids are stable enough for
+  // that to be a no-op when hydration agrees.
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => [createWorkspace("First workspace")]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -475,12 +478,15 @@ export default function Home() {
               <Button variant="ghost" size="sm" className="lg:hidden" onClick={create}>
                 <Plus className="size-3.5" /> New
               </Button>
-              <a
-                href="https://github.com/nttare0/Load-Bearing."
-                className="hidden text-[0.75rem] text-ink-3 no-underline hover:text-foreground sm:block"
-              >
-                Source
-              </a>
+              <Button variant="ghost" size="icon" className="size-7" asChild>
+                <a
+                  href="https://github.com/nttare0/Load-Bearing."
+                  aria-label="Source code on GitHub"
+                  className="text-ink-3 hover:text-foreground"
+                >
+                  <Code2 className="size-3.5" />
+                </a>
+              </Button>
             </div>
           </div>
         </header>
