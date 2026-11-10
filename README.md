@@ -217,6 +217,40 @@ Plans live in `lib/plans.ts` (browser storage, like workspaces). The server stil
 stores single analyses and knows nothing about plan identity — a shared link
 shows one run, not a history the reader cannot verify.
 
+## MiroFish: simulation as research, never as evidence
+
+[MiroFish](https://github.com/666ghj/MiroFish) is a swarm-intelligence engine: it
+builds a knowledge graph from seed material, generates agents with personas, and
+runs a multi-round social simulation that ends in a report. It is useful for one
+question this tool otherwise cannot answer — *how might the people in this plan
+actually behave?*
+
+It is also the most dangerous thing that could be attached to an app whose
+premise is "no invented evidence", because a simulation report reads exactly
+like a finding. So it is wired in under a boundary that is enforced rather than
+described:
+
+| | |
+|---|---|
+| **Where it runs** | One route, `POST /api/research/mirofish`, from the report's **Simulate** tab |
+| **What it is given** | One question, and the refs and text of existing claims — never permission to write one |
+| **What it returns** | Predictions, each labelled `prediction`, each leaning `supports` / `undercuts` / `unclear` |
+| **What it cannot do** | Enter `evidence`, change a status, change a score, add or remove a claim. The response type has no field that could carry a claim or a URL |
+| **When it is on** | Only with **both** `MIROFISH_BASE_URL` and `MIROFISH_RESEARCH=1`. With either missing the route answers 409 and nothing leaves the server |
+
+MiroFish is self-hosted — there is no public endpoint to point at — so the app
+does not pretend to ship one. Point `MIROFISH_BASE_URL` at your instance
+(default `http://localhost:5001`) and follow its own setup: it needs its own LLM
+key (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL_NAME`) and a Zep Cloud key.
+
+**Keep runs under 40 rounds.** A MiroFish run generates a persona per entity and
+then simulates dozens of agents over dozens of rounds; the README says plainly
+that consumption is high. The route caps rounds at 40.
+
+The report text is parsed without a model pass. Asking a second model to
+summarise a simulation would put a third layer of invention between the user and
+the guess.
+
 ## Two providers, one interface
 
 `lib/ai.ts` exposes one `structuredPass` and one `prose` call. Behind them sit
@@ -320,6 +354,7 @@ app/
   api/health            which capabilities are actually configured
 lib/
   gemini.ts             Gemini over REST: schema-constrained + prose calls
+  mirofish.ts           MiroFish client; predictions only, never evidence
   workspace.ts          workspaces, threads and their storage
   plans.ts              a plan and its runs, so re-analysis can be compared
   diff.ts               stable claim keys + what moved between two runs
