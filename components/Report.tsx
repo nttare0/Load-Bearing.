@@ -12,6 +12,7 @@ import { ClaimCard } from "@/components/ClaimCard";
 import { DependencyGraph } from "@/components/DependencyGraph";
 import { PriorityChart } from "@/components/PriorityChart";
 import { ProgressPanel } from "@/components/ProgressPanel";
+import { ResearchPanel } from "@/components/ResearchPanel";
 import { RunDiff } from "@/components/RunDiff";
 import { StatusBadge } from "@/components/ConfidenceBadge";
 import { toJson, toMarkdown } from "@/lib/export";
@@ -202,6 +203,7 @@ export function Report({
           <TabsTrigger value="ranked">Ranked list</TabsTrigger>
           <TabsTrigger value="graph">Dependency map</TabsTrigger>
           <TabsTrigger value="premortem">Pre-mortem</TabsTrigger>
+          <TabsTrigger value="simulate">Simulate</TabsTrigger>
           <TabsTrigger value="markdown">Report text</TabsTrigger>
         </TabsList>
 
@@ -266,6 +268,12 @@ export function Report({
               );
             })
           )}
+        </TabsContent>
+
+        {/* Beside the report, never inside it: this tab produces predictions,
+            and a prediction is not something the report can hold. */}
+        <TabsContent value="simulate">
+          <ResearchPanel claims={analysis.claims} />
         </TabsContent>
 
         <TabsContent value="markdown">
