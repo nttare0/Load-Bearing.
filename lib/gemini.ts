@@ -103,9 +103,18 @@ export async function generate(opts: GeminiCall): Promise<GeminiResult> {
     response = await post(model, key, retryBody);
   }
 
-  // A model alias that this key cannot see is a configuration mistake, not a
-  // model mistake: walk the list once before giving up.
-  if (response.error && /not found|not supported|does not exist/i.test(response.error.message ?? "")) {
+  // An overloaded model is worth one more second, not a failed analysis:
+  // "high demand" spikes clear on their own most of the time.
+  if (response.error && TRANSIENT.test(response.error.message ?? "")) {
+    await sleep(700);
+    response = await post(model, key, body);
+  }
+
+  // Then walk the list once. Two different failures land here: a model this
+  // key cannot see is a configuration mistake, and a model that is busy or out
+  // of quota is a capacity problem. Both are better answered by the next model
+  // than by handing the user an error after a five-pass pipeline.
+  if (response.error && SHOULD_FALL_THROUGH.test(response.error.message ?? "")) {
     for (const fallback of GEMINI_MODELS) {
       if (fallback === model) continue;
       model = fallback;
@@ -126,6 +135,15 @@ export async function generate(opts: GeminiCall): Promise<GeminiResult> {
     outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
     truncated: candidate?.finishReason === "MAX_TOKENS",
   };
+}
+
+const TRANSIENT = /high demand|overloaded|temporarily|try again|503/i;
+
+const SHOULD_FALL_THROUGH =
+  /not found|not supported|does not exist|no longer available|high demand|overloaded|resource.?exhausted|quota|rate limit|503/i;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function isEmptyTruncation(response: GeminiResponse): boolean {
