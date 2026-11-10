@@ -1,0 +1,162 @@
+import { z } from "zod";
+
+/**
+ * Gemini, over its REST API.
+ *
+ * Called directly instead of through an SDK: the two things this app needs are
+ * a schema-constrained JSON reply and a prose reply, and both are one POST. The
+ * project id is not a credential — it names which Google Cloud project the key
+ * belongs to, and is reported so a misconfigured key is diagnosable instead of
+ * just failing.
+ */
+
+export const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"];
+
+export function geminiKey(): string | null {
+  return (
+    process.env.GEMINI_API_KEY ??
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ??
+    process.env.GOOGLE_API_KEY ??
+    null
+  );
+}
+
+export function geminiProject(): string | null {
+  return (
+    process.env.GOOGLE_CLOUD_PROJECT ??
+    process.env.GOOGLE_CLOUD_PROJECT_ID ??
+    process.env.GCLOUD_PROJECT ??
+    null
+  );
+}
+
+export function geminiModel(): string {
+  return process.env.GEMINI_MODEL ?? GEMINI_MODELS[0];
+}
+
+type Part = { text?: string };
+type Candidate = { content?: { parts?: Part[] }; finishReason?: string };
+type GeminiResponse = {
+  candidates?: Candidate[];
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+  error?: { message?: string; status?: string };
+};
+
+export type GeminiCall = {
+  system?: string;
+  user: string;
+  maxTokens?: number;
+  /** Ask for JSON constrained to this schema. */
+  schema?: z.ZodType;
+  /** 0 for the extraction passes, where the same plan should read the same way. */
+  temperature?: number;
+};
+
+export type GeminiResult = {
+  text: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  /** True when the reply was truncated, so callers can say so rather than
+   *  treating half a JSON object as a schema violation. */
+  truncated: boolean;
+};
+
+export async function generate(opts: GeminiCall): Promise<GeminiResult> {
+  const key = geminiKey();
+  if (!key) throw new Error("GEMINI_API_KEY is not set");
+
+  let model = geminiModel();
+  const body: Record<string, unknown> = {
+    systemInstruction: opts.system ? { parts: [{ text: opts.system }] } : undefined,
+    contents: [{ role: "user", parts: [{ text: opts.user }] }],
+    generationConfig: {
+      maxOutputTokens: opts.maxTokens ?? 4096,
+      temperature: opts.temperature ?? 0.4,
+      ...(opts.schema
+        ? {
+            responseMimeType: "application/json",
+            responseJsonSchema: z.toJSONSchema(opts.schema, { io: "output" }),
+          }
+        : {}),
+    },
+  };
+
+  let response = await post(model, key, body);
+
+  // A model alias that this key cannot see is a configuration mistake, not a
+  // model mistake: walk the list once before giving up.
+  if (response.error && /not found|not supported|does not exist/i.test(response.error.message ?? "")) {
+    for (const fallback of GEMINI_MODELS) {
+      if (fallback === model) continue;
+      model = fallback;
+      response = await post(model, key, body);
+      if (!response.error) break;
+    }
+  }
+
+  if (response.error) throw new Error(response.error.message ?? "Gemini returned an error");
+
+  const candidate = response.candidates?.[0];
+  const text = (candidate?.content?.parts ?? []).map((part) => part.text ?? "").join("").trim();
+
+  return {
+    text,
+    model,
+    inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
+    outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+    truncated: candidate?.finishReason === "MAX_TOKENS",
+  };
+}
+
+async function post(model: string, key: string, body: unknown): Promise<GeminiResponse> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  const payload = (await res.json().catch(() => ({}))) as GeminiResponse;
+  if (!res.ok && !payload.error) {
+    return { error: { message: `Gemini returned HTTP ${res.status}` } };
+  }
+  return payload;
+}
+
+/** Run a schema-constrained call and parse it. Throws with the parse error so
+ *  the caller can hand it back to the model for one more attempt. */
+export async function generateStructured<T>(
+  schema: z.ZodType<T>,
+  opts: Omit<GeminiCall, "schema">
+): Promise<{ data: T; model: string; inputTokens: number; outputTokens: number; truncated: boolean }> {
+  const result = await generate({ ...opts, schema });
+  const parsed = schema.safeParse(jsonOf(result.text));
+  if (!parsed.success) {
+    throw new Error(`Gemini reply did not match the schema: ${parsed.error.message.slice(0, 400)}`);
+  }
+  return {
+    data: parsed.data,
+    model: result.model,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    truncated: result.truncated,
+  };
+}
+
+/** Models sometimes wrap JSON in a fence even when asked not to. */
+function jsonOf(text: string): unknown {
+  const trimmed = text.trim();
+  const unfenced = trimmed.startsWith("```")
+    ? trimmed.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "")
+    : trimmed;
+  try {
+    return JSON.parse(unfenced);
+  } catch {
+    const start = unfenced.indexOf("{");
+    const end = unfenced.lastIndexOf("}");
+    if (start >= 0 && end > start) return JSON.parse(unfenced.slice(start, end + 1));
+    throw new Error("Gemini returned no parseable JSON");
+  }
+}

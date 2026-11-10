@@ -217,6 +217,30 @@ Plans live in `lib/plans.ts` (browser storage, like workspaces). The server stil
 stores single analyses and knows nothing about plan identity — a shared link
 shows one run, not a history the reader cannot verify.
 
+## Two providers, one interface
+
+`lib/ai.ts` exposes one `structuredPass` and one `prose` call. Behind them sit
+Claude and Gemini, and the app picks:
+
+- **Claude** when `ANTHROPIC_API_KEY` is set — it stays the default, because the
+  pipeline's prompts and its web-search pass were written against it.
+- **Gemini** when that is the only key — `GEMINI_API_KEY` (or
+  `GOOGLE_GENERATIVE_AI_API_KEY` / `GOOGLE_API_KEY`), over Gemini's REST API with
+  no extra SDK. Schema-constrained output uses `responseJsonSchema` from
+  `z.toJSONSchema`, so the same Zod schemas gate both providers. Temperature is
+  held at 0.2 for the extraction and scoring passes: the same plan should read
+  the same way twice.
+
+`GOOGLE_CLOUD_PROJECT` is **not a credential** — it names the Google Cloud
+project a key belongs to. `/api/health` reports it (`provider`, `model`,
+`project`) so a key that belongs to the wrong project is a one-request diagnosis
+instead of a mystery.
+
+**One honest gap:** Gemini is not given a web-search tool here, so when Gemini is
+the provider the evidence pass returns nothing and says so — every claim stays
+`unverified` rather than receiving a citation nobody opened. Run on Claude if you
+want the web check.
+
 ## One workspace, one thread
 
 The page has **no header**. A question in serif, a composer under it, and one
@@ -293,6 +317,7 @@ app/
   api/extract           PDF, DOCX, Markdown, text and URL extraction
   api/health            which capabilities are actually configured
 lib/
+  gemini.ts             Gemini over REST: schema-constrained + prose calls
   workspace.ts          workspaces, threads and their storage
   plans.ts              a plan and its runs, so re-analysis can be compared
   diff.ts               stable claim keys + what moved between two runs

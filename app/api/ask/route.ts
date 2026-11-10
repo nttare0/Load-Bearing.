@@ -1,4 +1,4 @@
-import { client, hasApiKey, MODEL } from "@/lib/ai";
+import { hasApiKey, prose } from "@/lib/ai";
 import type { Analysis } from "@/lib/schema";
 
 export const runtime = "nodejs";
@@ -109,11 +109,10 @@ ${context.notes?.length ? `\nPipeline notes:\n${context.notes.map((n) => `- ${n}
   }));
 
   try {
-    const response = await client().messages.create({
-      model: MODEL,
-      max_tokens: 1024,
+    const { text } = await prose({
       system: SYSTEM,
-      messages: [
+      maxTokens: 1024,
+      turns: [
         { role: "user", content: `Here is the workspace.\n\n${workspace}` },
         { role: "assistant", content: "Understood. I will answer only from this workspace." },
         ...history,
@@ -121,12 +120,7 @@ ${context.notes?.length ? `\nPipeline notes:\n${context.notes.map((n) => `- ${n}
       ],
     });
 
-    const answer = response.content
-      .flatMap((block) => (block.type === "text" ? [block.text] : []))
-      .join("\n")
-      .trim();
-
-    return Response.json({ answer: answer || "The model returned nothing. Ask again.", mode: "live" });
+    return Response.json({ answer: text || "The model returned nothing. Ask again.", mode: "live" });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/rate|429|529|overloaded/i.test(message)) {
