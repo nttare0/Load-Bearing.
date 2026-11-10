@@ -39,6 +39,19 @@ export function geminiModel(): string {
   return process.env.GEMINI_MODEL ?? GEMINI_MODELS[0];
 }
 
+/**
+ * How much the model is allowed to think before it answers.
+ *
+ * These passes are extraction and scoring against a fixed schema, not open
+ * reasoning. Gemini 3.8 thinks at `medium` by default, and thinking tokens are
+ * billed and counted against the output budget — so the default here is `low`.
+ * Five passes at medium is five times the latency for answers that a schema was
+ * always going to constrain anyway. Override with GEMINI_THINKING=medium.
+ */
+export function geminiThinking(): string {
+  return process.env.GEMINI_THINKING ?? "low";
+}
+
 type Part = { text?: string };
 type Candidate = { content?: { parts?: Part[] }; finishReason?: string };
 type GeminiResponse = {
@@ -78,6 +91,7 @@ export async function generate(opts: GeminiCall): Promise<GeminiResult> {
     generationConfig: {
       maxOutputTokens: opts.maxTokens ?? 4096,
       temperature: opts.temperature ?? 0.4,
+      ...(thinking() ? { thinkingConfig: { thinkingLevel: thinking() } } : {}),
       ...(opts.schema
         ? {
             responseMimeType: "application/json",
@@ -88,6 +102,12 @@ export async function generate(opts: GeminiCall): Promise<GeminiResult> {
   };
 
   let response = await post(model, key, body);
+
+  // If this key or model rejects the thinking parameter, say nothing about it
+  // and ask again without it rather than failing the whole pass over a hint.
+  if (response.error && /thinking/i.test(response.error.message ?? "")) {
+    response = await post(model, key, withoutThinking(body));
+  }
 
   // A thinking model can spend the entire output budget on its private
   // reasoning and return nothing at all. That is a budget problem, not a
@@ -144,6 +164,16 @@ const SHOULD_FALL_THROUGH =
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function thinking(): string | null {
+  return geminiThinking() || null;
+}
+
+function withoutThinking(body: Record<string, unknown>): Record<string, unknown> {
+  const config = { ...(body.generationConfig as Record<string, unknown>) };
+  delete config.thinkingConfig;
+  return { ...body, generationConfig: config };
 }
 
 function isEmptyTruncation(response: GeminiResponse): boolean {

@@ -1,4 +1,6 @@
 import { runPipeline } from "@/lib/pipeline";
+import { structuredPass } from "@/lib/ai";
+import { ExtractionOutputSchema } from "@/lib/schema";
 import { describeProvider, hasApiKey } from "@/lib/ai";
 import type { Analysis, PipelineEvent } from "@/lib/schema";
 
@@ -31,10 +33,48 @@ The founder has cooked professionally for three years and has 900 Instagram foll
 type StageTiming = { stage: string; ms: number };
 type StageError = { stage: "extract" | "premortem" | "score" | "evidence" | "tests" | "unknown"; message: string };
 
-export async function GET() {
+export async function GET(request: Request) {
   const providerInfo = describeProvider();
   if (!hasApiKey()) {
     return Response.json({ ok: false, reason: "no key configured — nothing to test" }, { status: 409 });
+  }
+
+  // `?only=extract` runs just the first pass. Five passes take minutes and the
+  // browser, a proxy or a cold start will give up long before that — but a
+  // single pass answers the only question worth asking first: does this key,
+  // this model and this schema produce valid claims, and how long does it take?
+  const only = new URL(request.url).searchParams.get("only");
+  if (only === "extract") {
+    const t0 = Date.now();
+    try {
+      const pass = await structuredPass({
+        system: "You extract the assumptions a plan rests on.",
+        user: `THE PLAN\n\n${SAMPLE}\n\nExtract the claims the author states.`,
+        schema: ExtractionOutputSchema,
+        maxTokens: 4096,
+      });
+      return Response.json({
+        ok: pass.data.claims.length > 0,
+        ...providerInfo,
+        ms: Date.now() - t0,
+        model: pass.model,
+        claims: pass.data.claims.length,
+        summary: pass.data.summary?.slice(0, 200),
+        tokens: { in: pass.inputTokens, out: pass.outputTokens },
+        retries: pass.retries,
+        sample: pass.data.claims.slice(0, 4).map((c) => ({
+          ref: c.ref,
+          status: c.status,
+          impact: c.impact,
+          claim: c.claim.slice(0, 110),
+        })),
+      });
+    } catch (error) {
+      return Response.json(
+        { ok: false, ...providerInfo, ms: Date.now() - t0, error: error instanceof Error ? error.message.slice(0, 400) : String(error) },
+        { status: 502 }
+      );
+    }
   }
 
   const started = Date.now();
