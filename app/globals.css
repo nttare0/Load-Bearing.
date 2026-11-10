@@ -75,6 +75,47 @@
   --lb-light: hsl(163 58% 27%);
   --lb-light-soft: hsl(160 55% 95%);
 
+  /* --- charts: the Bklit UI contract, pointed at the band palette ---
+     Bklit's charts read a fixed set of --chart-* variables. Rather than
+     inventing a second palette, each one is mapped to a token that already
+     means something here: the bars carry the three bands, the grid is the
+     page's own hairline, and the tooltip is the popover. */
+  --chart-background: transparent;
+  --chart-foreground: var(--to-ink);
+  --chart-foreground-muted: var(--to-ink-3);
+  --chart-label: var(--to-ink-3);
+  --chart-grid: var(--to-border);
+  --chart-crosshair: var(--to-ink-3);
+  --chart-1: var(--lb-load);
+  --chart-2: var(--lb-structural);
+  --chart-3: var(--lb-light);
+  --chart-4: var(--to-ink-3);
+  --chart-5: var(--to-ink);
+  --chart-positive: var(--lb-light);
+  --chart-negative: var(--lb-load);
+  --chart-line-primary: var(--to-accent);
+  --chart-line-secondary: var(--to-ink-3);
+  --chart-tooltip-background: var(--to-bg);
+  --chart-tooltip-foreground: var(--to-ink);
+  --chart-tooltip-muted: var(--to-ink-3);
+  --chart-indicator-color: var(--to-ink);
+  --chart-indicator-secondary-color: var(--to-border);
+  --chart-marker-background: var(--to-bg);
+  --chart-marker-border: var(--to-border);
+  --chart-marker-foreground: var(--to-ink);
+  --chart-marker-badge-background: var(--to-ink);
+  --chart-marker-badge-foreground: var(--to-bg);
+  --chart-segment-background: transparent;
+  --chart-segment-line: var(--to-border);
+  --chart-brush-border: var(--to-border);
+  --chart-scale-mix: var(--to-bg);
+  --chart-scale-01: var(--to-border);
+  --chart-scale-02: var(--lp-scale-2, var(--lb-structural-soft));
+  --chart-scale-03: var(--lb-structural);
+  --chart-scale-04: var(--lb-structural);
+  --chart-scale-05: var(--lb-load);
+  --chart-scale-pattern-color: var(--to-bg);
+
   /* Status: the four labels a claim can wear. */
   --lb-fact: hsl(152 45% 27%);
   --lb-fact-soft: hsl(152 40% 94%);
@@ -141,6 +182,39 @@
   --lb-fact-soft: hsl(152 30% 16%);
   --lb-guess: hsl(38 92% 66%);
   --lb-guess-soft: hsl(32 35% 17%);
+  /* Charts in dark mode read the dark band palette; only the values that do
+     not follow a band (grid, tooltip surface) need restating. */
+  --chart-background: transparent;
+  --chart-foreground: var(--to-ink);
+  --chart-foreground-muted: var(--to-ink-3);
+  --chart-label: var(--to-ink-3);
+  --chart-grid: var(--to-border);
+  --chart-crosshair: var(--to-ink-3);
+  --chart-1: var(--lb-load);
+  --chart-2: var(--lb-structural);
+  --chart-3: var(--lb-light);
+  --chart-4: var(--to-ink-3);
+  --chart-5: var(--to-ink);
+  --chart-positive: var(--lb-light);
+  --chart-negative: var(--lb-load);
+  --chart-line-primary: var(--to-accent);
+  --chart-line-secondary: var(--to-ink-3);
+  --chart-tooltip-background: var(--to-surface);
+  --chart-tooltip-foreground: var(--to-ink);
+  --chart-tooltip-muted: var(--to-ink-3);
+  --chart-indicator-color: var(--to-ink);
+  --chart-indicator-secondary-color: var(--to-border);
+  --chart-marker-background: var(--to-surface);
+  --chart-marker-border: var(--to-border);
+  --chart-marker-foreground: var(--to-ink);
+  --chart-marker-badge-background: var(--to-ink);
+  --chart-marker-badge-foreground: var(--to-bg);
+  --chart-segment-background: transparent;
+  --chart-segment-line: var(--to-border);
+  --chart-brush-border: var(--to-border);
+  --chart-scale-mix: var(--to-bg);
+  --chart-scale-01: var(--to-border);
+
   --lb-unverified: var(--to-ink-3);
   --lb-unverified-soft: hsl(240 5.7% 22%);
   --lb-contradicted: hsl(0 84% 70%);

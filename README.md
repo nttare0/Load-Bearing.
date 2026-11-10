@@ -170,6 +170,25 @@ The theme lives in `app/globals.css` under the standard `--background / --foregr
 Load-Bearing keeps its own ink-on-paper palette in those slots, plus three band colours for
 load-bearing / structural / light partitions.
 
+## Charts
+
+The priority chart is [Bklit UI](https://bklit.com/) — MIT, by [uixmat](https://github.com/uixmat/bklit-ui).
+`components/charts/*` is Bklit's own registry output, vendored the same way as shadcn: `bar-chart` plus its
+nine registry dependencies (`chart-context`, `chart-tooltip`, `chart-animation`, `chart-utils`, `grid`,
+`chart-parent-size`, `patterns`, `gradients`), resolved from its `packages/ui/registry.json` rather than
+guessed at. Its licence sits next to the files in `components/charts/LICENSE`.
+
+Nothing in those files was rewritten. The palette they read is the point of the exercise: Bklit's
+`--chart-*` contract is mapped onto tokens this page already had, so the bars carry the three bands
+(`--chart-1/2/3` → `--lb-load/structural/light`), the grid is the page hairline, and the tooltip is the
+popover. Light and dark are both wired in `app/globals.css`.
+
+Install again with the registry, unchanged:
+
+```bash
+npx shadcn@latest add @bklit/bar-chart   # after adding "@bklit": "https://ui.bklit.com/r/{name}.json"
+```
+
 ## Project layout
 
 ```
@@ -191,8 +210,10 @@ lib/
 components/
   ClaimCard             one claim, its quote, its evidence, its test
   DependencyGraph       React Flow map, layered by dependency depth
+  PriorityChart         the ranking, drawn with Bklit's bar chart
   Report                tabs, counts, exports, pre-mortem
   PlanInput             paste / upload / URL
+  charts/               Bklit UI, vendored (see Charts)
 supabase/schema.sql     the one table
 ```
 

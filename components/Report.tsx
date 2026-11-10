@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ClaimCard } from "@/components/ClaimCard";
 import { DependencyGraph } from "@/components/DependencyGraph";
+import { PriorityChart } from "@/components/PriorityChart";
 import { StatusBadge } from "@/components/ConfidenceBadge";
 import { toJson, toMarkdown } from "@/lib/export";
 import { downloadPdf } from "@/lib/pdf";
@@ -162,6 +163,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
 
         <TabsContent value="ranked" className="flex flex-col gap-[0.75rem]">
           <p className="lb-hint text-[0.75rem]">Ranked by impact × uncertainty.</p>
+          <PriorityChart claims={analysis.claims} />
           {analysis.claims.map((claim) => (
             <ClaimCard
               key={claim.id}
