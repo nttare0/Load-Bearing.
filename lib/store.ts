@@ -17,6 +17,10 @@ import { AnalysisSchema } from "./schema";
 
 export const ANALYSIS_TABLE = "analyses";
 
+/** Saved reports expire. A plan that rests on an unreleased decision should
+ *  not sit in a database forever because someone forgot the delete button. */
+export const RETENTION_DAYS = 30;
+
 export function supabaseAdmin(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL;
   const key =
@@ -88,11 +92,17 @@ export async function loadAnalysis(id: string): Promise<Analysis | null> {
   try {
     const { data, error } = await db
       .from(ANALYSIS_TABLE)
-      .select("payload")
+      .select("payload, created_at")
       .eq("id", id)
       .maybeSingle();
 
     if (error || !data?.payload) return null;
+
+    const age = Date.now() - new Date(data.created_at as string).getTime();
+    if (age > RETENTION_DAYS * 24 * 60 * 60 * 1000) {
+      await deleteAnalysis(id).catch(() => undefined);
+      return null;
+    }
 
     const parsed = AnalysisSchema.safeParse(data.payload);
     return parsed.success ? parsed.data : null;

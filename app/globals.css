@@ -31,7 +31,7 @@
   --to-surface: hsl(0 0% 100%);
   --to-surface-2: hsl(240 4.8% 95.9%);
   --to-border: hsl(240 4.9% 83.9%);
-  --to-border-strong: hsl(240 5% 64.9%);
+  --to-border-strong: hsl(240 4.9% 46%);
   --to-ink: hsl(240 5.9% 10%);
   --to-ink-2: hsl(240 5.3% 26.1%);
   --to-ink-3: hsl(240 5.2% 33.9%);
@@ -52,9 +52,10 @@
   --to-max-w: 67.5rem;
   --to-gutter: 1rem;
   --to-touch: 2.75rem;
-  /* The header's height: nav furniture, three and a half of the touch target's
-     em, exactly as tiny office sets --to-header-h. */
-  --to-header-h: 3.5rem;
+  /* The header's height, as tiny office reckons it: three and a half of the
+     nav's font size. */
+  --to-nav-font: 1rem;
+  --to-header-h: calc(3.5 * var(--to-nav-font));
   --to-line: 1.5;
   --to-line-label: 1.25;
 
@@ -75,7 +76,7 @@
   --lb-guess: hsl(32 82% 32%);
   --lb-guess-soft: hsl(38 90% 94%);
   --lb-unverified: var(--to-ink-3);
-  --lb-unverified-soft: var(--to-surface-2);
+  --lb-unverified-soft: hsl(240 6% 93%);
   --lb-contradicted: hsl(0 62% 42%);
   --lb-contradicted-soft: hsl(0 76% 96%);
 
@@ -136,7 +137,7 @@
   --lb-guess: hsl(38 92% 66%);
   --lb-guess-soft: hsl(32 35% 17%);
   --lb-unverified: var(--to-ink-3);
-  --lb-unverified-soft: var(--to-surface-2);
+  --lb-unverified-soft: hsl(240 5.7% 22%);
   --lb-contradicted: hsl(0 84% 70%);
   --lb-contradicted-soft: hsl(0 35% 19%);
 
@@ -271,19 +272,6 @@
   }
 
   /* Hover/focus on anything that behaves like one of tiny office's cards. */
-  .lb-interactive {
-    transition:
-      border-color 0.15s,
-      box-shadow 0.15s,
-      background-color 0.15s;
-  }
-  .lb-interactive:hover {
-    border-color: var(--to-accent);
-    box-shadow:
-      0 0 0 1px var(--to-accent),
-      var(--to-shadow);
-  }
-
   .lb-label {
     font-size: 0.75rem;
     font-weight: 600;
@@ -348,9 +336,6 @@
   @media (prefers-reduced-motion: reduce) {
     .animate-rise {
       animation: none;
-    }
-    .lb-interactive {
-      transition: none;
     }
   }
 }

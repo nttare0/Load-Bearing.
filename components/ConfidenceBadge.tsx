@@ -39,7 +39,7 @@ export function StatusBadge({ status }: { status: Status }) {
 export function ScoreBadge({ claim }: { claim: Claim }) {
   const tone = claim.priority >= 8 ? "load" : claim.priority >= 5 ? "structural" : "light";
   return (
-    <Badge variant={tone} className="font-mono-tight">
+    <Badge variant={tone} className="lb-mono">
       {bandLabel(claim.priority)} · {claim.impact}/5 · {claim.confidence}
     </Badge>
   );

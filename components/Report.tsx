@@ -121,7 +121,7 @@ export function Report({ analysis, persisted, onDelete, onOutcome, outcomes = {}
             <Badge variant="load">{counts.load} load-bearing</Badge>
             <Badge variant="structural">{counts.structural} structural</Badge>
             <Badge variant="light">{counts.light} light</Badge>
-            <span className="mx-1 h-3 w-px bg-rule" aria-hidden />
+            <span className="mx-[0.25em] h-3 w-px bg-[var(--to-border)]" aria-hidden />
             <span>{counts.fact} fact</span>
             <span>·</span>
             <span>{counts.guess} guess</span>

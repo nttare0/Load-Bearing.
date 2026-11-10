@@ -431,7 +431,7 @@ function Progress({
                 <li
                   key={item.key}
                   className={`flex items-center gap-2.5 text-[12.5px] ${
-                    done ? "text-muted-foreground" : active ? "text-foreground" : "text-muted-foreground/60"
+                    done ? "text-muted-foreground" : active ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
                   <span
