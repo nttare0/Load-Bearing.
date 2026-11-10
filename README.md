@@ -229,7 +229,9 @@ Claude and Gemini, and the app picks:
   no extra SDK. Schema-constrained output uses `responseJsonSchema` from
   `z.toJSONSchema`, so the same Zod schemas gate both providers. Temperature is
   held at 0.2 for the extraction and scoring passes: the same plan should read
-  the same way twice.
+  the same way twice. The model list starts at `gemini-3.8-flash`; the 2.x line
+  is retired for accounts created recently and answers with "no longer
+  available to new users" rather than a 404, so it is not offered as a fallback.
 
 `GOOGLE_CLOUD_PROJECT` is **not a credential** — it names the Google Cloud
 project a key belongs to. `/api/health` reports it (`provider`, `model`,

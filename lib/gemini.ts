@@ -10,7 +10,12 @@ import { z } from "zod";
  * just failing.
  */
 
-export const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"];
+/**
+ * Newest stable Flash first, then steadily older ones. The 2.x line is retired
+ * for accounts created recently — it answers with "no longer available to new
+ * users" rather than a 404 — so it is deliberately not in this list.
+ */
+export const GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
 
 export function geminiKey(): string | null {
   return (
@@ -84,6 +89,20 @@ export async function generate(opts: GeminiCall): Promise<GeminiResult> {
 
   let response = await post(model, key, body);
 
+  // A thinking model can spend the entire output budget on its private
+  // reasoning and return nothing at all. That is a budget problem, not a
+  // schema problem, so raise the budget once rather than reporting failure.
+  if (isEmptyTruncation(response) && (opts.maxTokens ?? 4096) < 16384) {
+    const retryBody = {
+      ...body,
+      generationConfig: {
+        ...(body.generationConfig as Record<string, unknown>),
+        maxOutputTokens: 16384,
+      },
+    };
+    response = await post(model, key, retryBody);
+  }
+
   // A model alias that this key cannot see is a configuration mistake, not a
   // model mistake: walk the list once before giving up.
   if (response.error && /not found|not supported|does not exist/i.test(response.error.message ?? "")) {
@@ -107,6 +126,12 @@ export async function generate(opts: GeminiCall): Promise<GeminiResult> {
     outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
     truncated: candidate?.finishReason === "MAX_TOKENS",
   };
+}
+
+function isEmptyTruncation(response: GeminiResponse): boolean {
+  const candidate = response.candidates?.[0];
+  if (!candidate || candidate.finishReason !== "MAX_TOKENS") return false;
+  return !(candidate.content?.parts ?? []).some((part) => (part.text ?? "").trim().length > 0);
 }
 
 async function post(model: string, key: string, body: unknown): Promise<GeminiResponse> {
