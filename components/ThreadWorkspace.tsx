@@ -15,13 +15,21 @@ import type { Workspace } from "@/lib/workspace";
 export function ThreadWorkspace({
   workspace,
   analyses,
+  prevOf,
+  planOf,
   onOutcome,
   onDeleteReport,
+  onRerun,
+  busy,
 }: {
   workspace: Workspace | null;
   analyses: Record<string, Analysis>;
+  prevOf: (analysisId: string) => Analysis | undefined;
+  planOf: (analysisId: string) => string | undefined;
   onOutcome: (analysisId: string, ref: string, outcome: "confirmed" | "broken" | "inconclusive") => void;
   onDeleteReport: (analysisId: string) => void;
+  onRerun: (planId: string) => void;
+  busy: boolean;
 }) {
   if (!workspace) {
     return (
@@ -82,8 +90,12 @@ export function ThreadWorkspace({
     <Thread
       messages={workspace.messages}
       analyses={analyses}
+      prevOf={prevOf}
+      planOf={planOf}
       onOutcome={onOutcome}
       onDeleteReport={onDeleteReport}
+      onRerun={onRerun}
+      busy={busy}
     />
   );
 }

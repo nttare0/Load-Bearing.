@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PanelLeft, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Composer } from "@/components/Composer";
+import { assignKeys } from "@/lib/diff";
+import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
 import { WorkspaceRail } from "@/components/WorkspaceRail";
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,7 @@ export default function Home() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"demo" | "live" | null>(null);
@@ -54,6 +57,7 @@ export default function Home() {
       const stored = localStorage.getItem(LS_ANALYSES);
       if (stored) setAnalyses(JSON.parse(stored) as Record<string, Analysis>);
       setRailCollapsed(localStorage.getItem(LS_RAIL) === "1");
+      setPlans(readPlans());
     } catch {
       // A corrupt cache is not worth a dialog.
     }
@@ -126,11 +130,14 @@ export default function Home() {
 
   // ---- analyse a plan: the pipeline, streamed into a report turn ----
   const analyze = useCallback(
-    async (text: string, keep: boolean) => {
+    async (text: string, keep: boolean, options?: { planId?: string; quiet?: boolean }) => {
       if (!current) return;
       setBusy(true);
-      const turnId = newId();
-      append({ id: turnId, role: "user", text, at: new Date().toISOString() });
+      // A re-run is the same plan again, so it does not repeat the plan text in
+      // the thread: the report it produces carries the diff instead.
+      if (!options?.quiet) {
+        append({ id: newId(), role: "user", text, at: new Date().toISOString() });
+      }
 
       try {
         const response = await fetch("/api/analyze", {
@@ -180,12 +187,34 @@ export default function Home() {
         }
 
         if (done) {
-          const analysis = done;
+          // Give the claims stable keys, and inherit any test result from the
+          // previous run of the same plan. Re-running must never throw away
+          // work the user already did.
+          const plan = options?.planId
+            ? plans.find((p) => p.id === options.planId)
+            : plans.find((p) => p.text.trim() === text.trim());
+          const lastRunId = plan?.runs[plan.runs.length - 1]?.analysisId;
+          const prior = lastRunId ? analyses[lastRunId] : undefined;
+
+          const analysis: Analysis = {
+            ...done,
+            planId: plan?.id,
+            run: (plan?.runs.length ?? 0) + 1,
+            claims: assignKeys(done.claims, prior),
+          };
+
+          const recorded = recordRun(plans, analysis, text);
+          setPlans(recorded.plans);
+          writePlans(recorded.plans);
+
           saveAnalyses({ ...analyses, [analysis.id]: analysis });
           update(current.id, (w) => ({
             ...w,
             name: w.name === "First workspace" || w.name === "Untitled workspace" ? nameFromPlan(text) : w.name,
-            plans: [...w.plans, { id: analysis.id, text, at: analysis.createdAt, title: analysis.title }],
+            plans: [
+              ...w.plans.filter((p) => p.id !== analysis.id),
+              { id: analysis.id, text, at: analysis.createdAt, title: analysis.title },
+            ],
             messages: [
               ...w.messages,
               {
@@ -211,7 +240,7 @@ export default function Home() {
         setBusy(false);
       }
     },
-    [analyses, append, current, saveAnalyses, update]
+    [analyses, append, current, plans, saveAnalyses, update]
   );
 
   // ---- ask about the work: read-only, answered from the workspace ----
@@ -285,6 +314,16 @@ export default function Home() {
       }
     },
     [analyses, append, current]
+  );
+
+  /** Run a plan again from its latest text, without re-pasting it. */
+  const rerun = useCallback(
+    (planId: string) => {
+      const plan = plans.find((p) => p.id === planId);
+      if (!plan || busy) return;
+      void analyze(plan.text, true, { planId: plan.id, quiet: true });
+    },
+    [analyze, busy, plans]
   );
 
   const recordOutcome = useCallback(
@@ -368,6 +407,16 @@ export default function Home() {
     [currentId, persist, select, workspaces]
   );
 
+  const prevOf = useCallback(
+    (analysisId: string) => previousRun(planForRun(plans, analysisId), analyses, analysisId),
+    [analyses, plans]
+  );
+
+  const planOf = useCallback(
+    (analysisId: string) => planForRun(plans, analysisId)?.id,
+    [plans]
+  );
+
   const toggleRail = useCallback(() => {
     setRailCollapsed((prev) => {
       try {
@@ -440,8 +489,12 @@ export default function Home() {
           <ThreadWorkspace
             workspace={current}
             analyses={analyses}
+            prevOf={prevOf}
+            planOf={planOf}
             onOutcome={recordOutcome}
             onDeleteReport={deleteReport}
+            onRerun={rerun}
+            busy={busy}
           />
           <div ref={endRef} />
         </main>
