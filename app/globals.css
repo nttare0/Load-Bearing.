@@ -334,6 +334,14 @@
     line-height: 1;
   }
 
+  /* Display type for the one heading that opens a workspace: Serif, because
+     that is what the rest of the app reserves for the wordmark. */
+  .lb-serif {
+    font-family: var(--to-font-serif);
+    font-weight: 400;
+    letter-spacing: -0.015em;
+  }
+
   /* Figures and keys: Plex Mono with tabular numerals. */
   .lb-mono {
     font-family: var(--to-font-mono);

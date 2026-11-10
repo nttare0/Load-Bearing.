@@ -189,6 +189,31 @@ Install again with the registry, unchanged:
 npx shadcn@latest add @bklit/bar-chart   # after adding "@bklit": "https://ui.bklit.com/r/{name}.json"
 ```
 
+## One workspace, one thread
+
+The page is a workspace, not a form. The left rail lists workspaces; the middle
+column is that workspace's thread; the composer at the bottom is always in reach.
+
+A workspace owns its plans, the reports they produced and the questions asked
+about them. Pasting a plan adds two turns (your text, the report). Asking a
+question adds two more (your question, the answer). Nothing leaves the browser
+except the single analysis the pipeline is asked to store, so the rail works
+before any account or database exists.
+
+**Two verbs, one box.** The composer decides between *analyse* and *answer* from
+what you typed — a question mark, or a question word in a short message — and
+says which it is about to do next to the send button. It never guesses silently.
+
+`POST /api/ask` is deliberately read-only. It is handed a summary of the
+workspace's reports and can only answer in prose: it cannot add a claim, change
+a score or record a test. Claims only ever come from the five-pass pipeline,
+because a claim has to arrive with a quote, a score and a test. An answer is not
+evidence, and each one says so underneath, along with what it looked at
+(`read 1 reports · 9 claims · 0 tested`).
+
+Without `ANTHROPIC_API_KEY`, research answers are composed from the report data
+itself — no model, and it says so rather than pretending.
+
 ## Testing a claim closes the loop
 
 A report is the start, not the answer. Every claim already carries the cheapest
@@ -228,13 +253,15 @@ dangling dependencies.
 
 ```
 app/
-  page.tsx              input + streamed results
+  page.tsx              the shell: rail, thread, composer
   r/[id]/page.tsx       read-only shared report
   api/analyze           the five-pass pipeline, streamed as SSE
+  api/ask               read-only research over the workspace's reports
   api/analysis          save / load / delete / record a test outcome
   api/extract           PDF, DOCX, Markdown, text and URL extraction
   api/health            which capabilities are actually configured
 lib/
+  workspace.ts          workspaces, threads and their storage
   progress.ts           what the recorded tests actually settled (derived)
   prompts.ts            the five pass prompts + the rubric in prose
   schema.ts             Zod claim schemas + pipeline event types
@@ -244,6 +271,9 @@ lib/
   extract.ts            dependency-free PDF/DOCX/HTML text extraction
   store.ts              localStorage-first storage, Supabase when available
 components/
+  WorkspaceRail         left rail: workspaces, collapsed to icons
+  Thread                the conversation, reports set in place
+  Composer              paste to analyse, ask to research
   ClaimCard             one claim, its quote, its evidence, its test
   DependencyGraph       React Flow map, layered by dependency depth
   PriorityChart         the ranking, drawn with Bklit's bar chart
