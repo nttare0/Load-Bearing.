@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { generateStructured } from "./gemini";
 import { EvidenceItemSchema, type EvidenceItem } from "./schema";
-import { client, MODEL } from "./ai";
+import { client, MODEL, provider } from "./ai";
 
 /**
  * Web evidence. This pass is deliberately separate from the scoring passes:
@@ -39,7 +40,6 @@ export async function gatherEvidence(
 ): Promise<EvidenceRun> {
   if (!claims.length) return { evidence: [], notes: [] };
 
-  const anthropic = client();
   const list = claims.map((c) => `- ${c.ref}: ${c.claim}`).join("\n");
 
   const prompt = `You are checking claims against public sources for a tool called Load-Bearing.
@@ -57,9 +57,24 @@ Rules:
 - "supports" = backs the claim. "contradicts" = the page says otherwise. "inconclusive" = related but does not settle it.
 - Include every claim ref you were given that has at least one source. Do not add claims that were not in the list.`;
 
+  // Gemini cannot be handed the web_search tool through this REST call, so it
+  // reports nothing rather than pretending: every claim stays unverified, and
+  // the note says which provider caused that. Better an honest gap than a
+  // fabricated citation.
+  if (provider() === "gemini") {
+    return {
+      evidence: [],
+      notes: [
+        "Web check skipped: the Gemini provider has no search tool wired up here, so nothing was verified online. Every claim stays unverified until you check it.",
+      ],
+    };
+  }
+
+  const anthropic = client();
+
   try {
     const response = await anthropic.messages.create({
-      model: MODEL,
+      model: MODEL(),
       max_tokens: 3000,
       system:
         "You verify claims with real web sources. You never fabricate a URL, a statistic, or a study. Reporting that a claim could not be verified is a successful outcome.",
@@ -79,7 +94,7 @@ Rules:
 
     // A second, cheap call forces the prose + search results into the schema.
     const parsed = await anthropic.messages.parse({
-      model: MODEL,
+      model: MODEL(),
       max_tokens: 2000,
       system: "You convert research notes into strict JSON. You never add a source that is not in the notes.",
       messages: [
