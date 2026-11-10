@@ -33,7 +33,26 @@ The founder has cooked professionally for three years and has 900 Instagram foll
 type StageTiming = { stage: string; ms: number };
 type StageError = { stage: "extract" | "premortem" | "score" | "evidence" | "tests" | "unknown"; message: string };
 
+/**
+ * Off in production unless explicitly switched on.
+ *
+ * Every call spends real model requests — five passes for the full run — so a
+ * public URL that any crawler or idle loop can hit is a way to empty someone's
+ * quota in an afternoon. Set ALLOW_SELFTEST=1 to enable it in production.
+ */
+function allowed(): boolean {
+  if (process.env.VERCEL_ENV !== "production") return true;
+  return process.env.ALLOW_SELFTEST === "1";
+}
+
 export async function GET(request: Request) {
+  if (!allowed()) {
+    return Response.json(
+      { error: "The self-test is off in production. Set ALLOW_SELFTEST=1 to enable it." },
+      { status: 404 }
+    );
+  }
+
   const providerInfo = describeProvider();
   if (!hasApiKey()) {
     return Response.json({ ok: false, reason: "no key configured — nothing to test" }, { status: 409 });
