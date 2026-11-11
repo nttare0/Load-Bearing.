@@ -6,10 +6,20 @@ import {
   type Analysis,
   type Claim,
   type PipelineEvent,
+  type RawClaim,
 } from "./schema";
-import { EXTRACTION_PROMPT, HIDDEN_PROMPT, PREMORTEM_PROMPT, SCORING_PROMPT, TEST_DESIGN_PROMPT } from "./prompts";
+import {
+  EXTRACTION_PROMPT,
+  HIDDEN_PROMPT,
+  NOT_A_PLAN_RESPONSE,
+  PREMORTEM_PROMPT,
+  SCORING_PROMPT,
+  TEST_DESIGN_PROMPT,
+} from "./prompts";
 import { dedupeClaims, deriveTitle, enforceStatus, priorityOf, rankAndCleanClaims, reconcile } from "./score";
 import { claimsWorthSearching, gatherEvidence, byRef } from "./evidence";
+import { judgeSource } from "./quotes";
+import { heuristicClaims } from "./heuristic";
 import { structuredPass } from "./ai";
 
 /**
@@ -83,15 +93,67 @@ export async function runPipeline(
   const notes: string[] = [];
 
   // ---------- Pass 1: extraction ----------
+  //
+  // The only pass whose failure used to kill the run. It is now the only pass
+  // that can degrade instead: a report without the model is thinner and says
+  // so, which is more useful than an error page over a working rubric.
   emit({ type: "stage", stage: "extract", detail: "Reading the plan and quoting the claims it states." });
-  const extraction = await structuredPass({
-    system: EXTRACTION_PROMPT,
-    user: `THE PLAN\n\n${planText}\n\nExtract the claims.`,
-    schema: ExtractionOutputSchema,
-    maxTokens: 4096,
-  });
 
-  const stated = normaliseRefs(dedupeClaims(extraction.data.claims)).map((c) => toClaim(c, false));
+  let extraction: { data: { summary: string; claims: RawClaim[] } };
+  try {
+    extraction = await structuredPass({
+      system: EXTRACTION_PROMPT,
+      user: `THE PLAN\n\n${planText}\n\nExtract the claims.`,
+      schema: ExtractionOutputSchema,
+      maxTokens: 4096,
+    });
+  } catch (error) {
+    // A model that cannot answer is a reason to say less, not to stop.
+    const fallback = heuristicClaims(planText);
+    if (fallback.length === 0) {
+      // If even the text gives nothing to hold, the honest answer is that this
+      // does not read like a plan — not a fabricated empty report.
+      throw new Error(
+        `Extraction failed (${short(error)}) and the text did not yield claims on its own. ${NOT_A_PLAN_RESPONSE}`
+      );
+    }
+    notes.push(
+      `No model answered the extraction pass (${short(error)}). These claims were read straight from the text with no model: the quotes are exact, the scores are conservative, and the hidden assumptions are missing. Run it again to get the full report.`
+    );
+    extraction = {
+      data: {
+        summary: `Read without a model: the ${fallback.length} sentences in this plan that assert something about money, timing, people or a third party.`,
+        claims: fallback.map((claim) => ({
+          ref: claim.ref,
+          claim: claim.claim,
+          source: claim.source,
+          category: claim.category,
+          status: claim.status,
+          impact: claim.impact,
+          confidence: claim.confidence,
+          dependsOn: [],
+          verifiable: false,
+          reasoning: claim.reasoning,
+        })),
+      },
+    };
+  }
+
+  let stated = normaliseRefs(dedupeClaims(extraction.data.claims)).map((c) => toClaim(c, false));
+
+  // A quote is checked against the plan before anything else happens to it.
+  // The prompt asks for verbatim; this is what makes the label mean something.
+  let paraphrased = 0;
+  stated = stated.map((claim) => {
+    const verdict = judgeSource(claim.source, planText);
+    if (verdict.status === "paraphrase") paraphrased += 1;
+    return { ...claim, source: verdict.source, sourceStatus: verdict.status };
+  });
+  if (paraphrased > 0) {
+    notes.push(
+      `${paraphrased} of ${stated.length} quoted source${stated.length === 1 ? "" : "s"} could not be found word for word in the plan, so ${paraphrased === 1 ? "it is" : "they are"} marked as paraphrase${paraphrased === 1 ? "" : "s"}.`
+    );
+  }
 
   // ---------- Pass 2: hidden assumptions ----------
   emit({
@@ -202,12 +264,24 @@ export async function runPipeline(
       if (!auditClaim) return c;
       const result = reconcile(c, auditClaim);
       if (result.note) notes.push(`${c.ref}: ${result.note}.`);
+      // A disagreement is information the user should be able to see, so it
+      // travels with the claim instead of only in a note that gets scrolled past.
+      const disagreed =
+        result.impact !== c.impact || result.confidence !== c.confidence
+          ? {
+              impact: result.impact,
+              confidence: result.confidence,
+              firstImpact: c.impact,
+              firstConfidence: c.confidence,
+            }
+          : undefined;
       return {
         ...c,
         impact: result.impact,
         confidence: result.confidence,
         status: auditClaim.status,
         priority: priorityOf(result.impact, result.confidence),
+        ...(disagreed ? { audit: disagreed } : {}),
       };
     });
     claims = rankAndCleanClaims(claims);

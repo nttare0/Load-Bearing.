@@ -177,6 +177,8 @@ export function Report({
         </div>
       </div>
 
+      <Checksum claims={analysis.claims} />
+
       {analysis.notes.length > 0 && (
         <div className="rounded-[var(--to-radius)] border border-[var(--lb-structural)]/40 bg-[var(--lb-structural-soft)] px-[0.75rem] py-[0.5rem]">
           <p className="lb-label text-[0.6875rem] text-[var(--lb-structural)]">Notes</p>
@@ -333,3 +335,44 @@ export function StatusLegend() {
 }
 
 export { bandLabel };
+
+/**
+ * What in this report has actually been checked, in one line.
+ *
+ * Three numbers that are easy to conflate and shouldn't be: how many claims are
+ * quotes from the plan, how many are paraphrases dressed as quotes, and how many
+ * had two scoring runs disagree. A reader should be able to see the shape of the
+ * evidence before reading a single claim.
+ */
+function Checksum({ claims }: { claims: Claim[] }) {
+  const verbatim = claims.filter((c) => c.sourceStatus === "verbatim").length;
+  const paraphrase = claims.filter((c) => c.sourceStatus === "paraphrase").length;
+  const implied = claims.filter((c) => c.source === "implied").length;
+  const disagreed = claims.filter((c) => c.audit).length;
+  const untested = claims.filter((c) => !c.outcome).length;
+
+  const parts: { label: string; value: number; warn?: boolean }[] = [
+    { label: "quoted", value: verbatim },
+    { label: "paraphrased", value: paraphrase, warn: paraphrase > 0 },
+    { label: "implied", value: implied },
+    { label: "scoring runs disagreed", value: disagreed, warn: disagreed > 0 },
+    { label: "untested", value: untested, warn: untested > 0 },
+  ].filter((part) => part.value > 0);
+
+  if (parts.length === 0) return null;
+
+  return (
+    <p className="flex flex-wrap items-baseline gap-x-[0.75rem] gap-y-[0.25rem] text-[0.75rem] text-ink-3">
+      {parts.map((part) => (
+        <span key={part.label} className="flex items-baseline gap-[0.25rem]">
+          <span
+            className={`lb-mono tabular-nums ${part.warn ? "text-[var(--to-warning)]" : "text-ink-2"}`}
+          >
+            {part.value}
+          </span>
+          {part.label}
+        </span>
+      ))}
+    </p>
+  );
+}

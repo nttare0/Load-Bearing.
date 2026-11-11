@@ -106,6 +106,26 @@ export const OutcomeRecordSchema = z.object({
 export const ClaimSchema = RawClaimSchema.extend({
   id: z.string().min(1),
   rank: z.number().int().min(1),
+  /**
+   * Whether the quote was found word for word in the plan. Checked server-side
+   * in lib/quotes.ts. Absent on reports stored before the check existed.
+   */
+  sourceStatus: z.enum(["verbatim", "implied", "paraphrase"]).optional(),
+  /**
+   * Where the two scoring runs disagreed, when they did. A disagreement is a
+   * signal about the claim, not a bug in the report, so it is kept.
+   */
+  audit: z
+    .object({
+      impact: z.number().int().min(1).max(5),
+      confidence: z.enum(CONFIDENCES),
+      /** The first pass's numbers, which the audit moves away from. */
+      firstImpact: z.number().int().min(1).max(5),
+      firstConfidence: z.enum(CONFIDENCES),
+    })
+    .optional(),
+  /** True when the claim came from the deterministic extractor, not a model. */
+  heuristic: z.boolean().optional(),
   /** impact * uncertainty weight, 1-10 scale, the sort key. */
   priority: z.number().min(1).max(10),
   evidence: z.array(EvidenceItemSchema),
