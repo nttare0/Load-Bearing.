@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowUp, ChevronDown, FileUp, FlaskConical, Loader2, Paperclip, Search } from "lucide-react";
+import { ArrowUp, ChevronDown, FileUp, FlaskConical, Loader2, Paperclip, Search, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -26,6 +26,7 @@ export function Composer({
   keep,
   onKeepChange,
   recent,
+  stage,
 }: {
   onAnalyze: (text: string, keep: boolean) => void;
   onAsk: (question: string) => void;
@@ -35,6 +36,8 @@ export function Composer({
   keep: boolean;
   onKeepChange: (value: boolean) => void;
   recent: { id: string; title: string }[];
+  /** The pipeline stage currently running, when one is. */
+  stage?: string | null;
 }) {
   const [text, setText] = useState("");
   const [override, setOverride] = useState<ComposerMode | null>(null);
@@ -156,22 +159,33 @@ export function Composer({
         </div>
       </div>
 
-      {/* Context strip: which workspace, and what will happen to it. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-[0.5rem] gap-y-[0.25rem] rounded-[0.625rem] border border-[var(--to-border)] px-[0.5rem] py-[0.375rem]">
-        <div className="flex min-w-0 items-center gap-[0.5rem]">
-          <span className="flex min-w-0 items-center gap-[0.375rem] rounded-[var(--to-radius-sm)] px-[0.25rem] text-[0.75rem] text-ink-2">
-            <span className="lb-mono shrink-0 text-ink-3">ws</span>
-            <span className="truncate">{workspaceName}</span>
-          </span>
-          {recent.length > 0 && (
-            <span className="lb-mono hidden truncate text-[0.6875rem] text-ink-3 sm:block">
-              {recent.length} report{recent.length === 1 ? "" : "s"}
-            </span>
-          )}
-        </div>
+      {/* The strip under the box is attached to it, the way the reference
+          attaches its repo and branch: state you can read without opening
+          anything. Here it names where the work lands and what the run does. */}
+      <div className="flex flex-wrap items-center gap-x-[0.5rem] gap-y-[0.25rem] px-[0.25rem] text-[0.75rem] text-ink-3">
+        <span className="flex min-w-0 items-center gap-[0.3125rem]">
+          <span className="lb-mono shrink-0 text-[0.6875rem]">ws</span>
+          <span className="max-w-[11rem] truncate text-ink-2">{workspaceName}</span>
+        </span>
 
-        <div className="flex items-center gap-[0.5rem]">
-          <label className="flex cursor-pointer items-center gap-[0.375rem] text-[0.75rem] text-ink-3">
+        <span aria-hidden className="text-[var(--to-border-strong)]">·</span>
+
+        <span className="lb-mono shrink-0 text-[0.6875rem]">
+          {recent.length} report{recent.length === 1 ? "" : "s"}
+        </span>
+
+        {busy && stage && (
+          <>
+            <span aria-hidden className="text-[var(--to-border-strong)]">·</span>
+            <span className="lb-mono flex min-w-0 items-center gap-[0.25rem] text-[0.6875rem] text-ink-2" role="status">
+              <Loader2 className="size-3 shrink-0 animate-spin" aria-hidden />
+              <span className="truncate">{stage}</span>
+            </span>
+          </>
+        )}
+
+        <span className="ml-auto flex items-center gap-[0.5rem]">
+          <label className="flex cursor-pointer items-center gap-[0.3125rem] text-[0.75rem] text-ink-3">
             <input
               type="checkbox"
               checked={keep}
@@ -180,10 +194,11 @@ export function Composer({
             />
             Keep
           </label>
-          <span className="lb-mono text-[0.6875rem] text-ink-3">
-            {aiMode === "live" ? "live" : aiMode === "demo" ? "demo" : ""}
+          <span className="lb-mono flex items-center gap-[0.25rem] text-[0.6875rem]">
+            <ShieldCheck aria-hidden className="size-3" />
+            {aiMode === "live" ? "live" : aiMode === "demo" ? "demo" : "—"}
           </span>
-        </div>
+        </span>
       </div>
     </div>
   );

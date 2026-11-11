@@ -121,15 +121,11 @@ export function Report({
 
   return (
     <div className="flex flex-col gap-[1rem]">
-      <Card className="gap-0 overflow-hidden rounded-[var(--to-radius)] border-border bg-transparent py-0">
-        <div className="flex flex-col gap-[0.75rem] p-[1rem]">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="lb-wordmark text-[1.375rem] leading-[1.2] sm:text-[1.625rem]">{analysis.title}</h2>
-              <p className="mt-[0.5rem] max-w-[38rem] text-[0.9375rem] leading-[1.6] text-ink-2">
-                {analysis.summary}
-              </p>
-            </div>
+      {/* The title lives in the thread row above, so the report opens straight
+          into what it found. */}
+      <div className="flex flex-col gap-[0.75rem]">
+        <div className="flex flex-wrap items-start justify-between gap-[0.5rem]">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => download("md")} disabled={busy === "md"}>
                 <FileText className="h-3.5 w-3.5" /> Markdown
@@ -179,7 +175,7 @@ export function Report({
             </span>
           </div>
         </div>
-      </Card>
+      </div>
 
       {analysis.notes.length > 0 && (
         <div className="rounded-[var(--to-radius)] border border-[var(--lb-structural)]/40 bg-[var(--lb-structural-soft)] px-[0.75rem] py-[0.5rem]">
@@ -210,7 +206,15 @@ export function Report({
         <TabsContent value="ranked" className="flex flex-col gap-[0.75rem]">
           <p className="lb-hint text-[0.75rem]">Ranked by impact × uncertainty.</p>
           <ProgressPanel analysis={analysis} />
-          <PriorityChart claims={analysis.claims} />
+          <div id={`claim-${analysis.claims[0]?.ref ?? "none"}`} aria-hidden />
+          <details className="group/chart">
+            <summary className="cursor-pointer list-none text-[0.75rem] text-ink-3 hover:text-foreground">
+              Where the weight sits
+            </summary>
+            <div className="pt-[0.5rem]">
+              <PriorityChart claims={analysis.claims} />
+            </div>
+          </details>
           {analysis.claims.map((claim) => (
             <div key={claim.id} id={`claim-${claim.ref}`}>
               <ClaimCard
