@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PanelLeft } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
+import { ResourceTree } from "@/components/ResourceTree";
+import { ProposalBar } from "@/components/ProposalBar";
+import { applyOne, plan, resourceFromAnalysis, type Verdict } from "@/lib/resources";
 import { SidePanel, PanelCard, PanelRow } from "@/components/SidePanel";
 import { toast } from "sonner";
 import { Composer } from "@/components/Composer";
@@ -68,6 +71,8 @@ export default function Home() {
   const [hydrated, setHydrated] = useState(false);
   const [railOpen, setRailOpen] = useState(true);
   const [stage, setStage] = useState<string | null>(null);
+  const [proposal, setProposal] = useState<{ verdicts: Verdict[]; note?: string } | null>(null);
+  const [tidyBusy, setTidyBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   // ---- load once, from the browser ----
@@ -244,6 +249,11 @@ export default function Home() {
             plans: [
               ...w.plans.filter((p) => p.id !== analysis.id),
               { id: analysis.id, text, at: analysis.createdAt, title: analysis.title },
+            ],
+            // Every report becomes a thing on the shelf, so it can be filed.
+            resources: [
+              ...w.resources.filter((r) => r.analysisId !== analysis.id),
+              resourceFromAnalysis(analysis),
             ],
             messages: [
               ...w.messages,
@@ -461,6 +471,83 @@ export default function Home() {
     });
   }, []);
 
+  // ---- the shelf: folders and resources ----
+
+  const addFolder = useCallback(
+    (name: string) => {
+      if (!currentId) return;
+      update(currentId, (w) => applyOne({ action: "create_folder", name }, w));
+    },
+    [currentId, update]
+  );
+
+  const moveResource = useCallback(
+    (resourceId: string, folderId: string | null) => {
+      if (!currentId) return;
+      update(currentId, (w) => applyOne({ action: "move", resourceId, folderId }, w));
+    },
+    [currentId, update]
+  );
+
+  const deleteResource = useCallback(
+    (target: { resourceId?: string; folderId?: string }) => {
+      if (!currentId) return;
+      update(currentId, (w) => applyOne({ action: "delete", ...target }, w));
+    },
+    [currentId, update]
+  );
+
+  /**
+   * Ask the model to tidy. Safe changes are applied straight away; deletions
+   * come back as questions and are applied one at a time, by a person.
+   */
+  const tidy = useCallback(async () => {
+    if (!current) return;
+    setTidyBusy(true);
+    try {
+      const response = await fetch("/api/organize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspace: current }),
+      });
+      const data = (await response.json()) as {
+        verdicts?: Verdict[];
+        note?: string;
+        error?: string;
+      };
+      if (!response.ok || !data.verdicts) {
+        toast.error(data.error ?? "Tidying failed. Nothing was changed.");
+        return;
+      }
+
+      // Apply what is safe. Deletions are held back for approval.
+      const safe = data.verdicts.filter((v) => v.applies);
+      if (safe.length > 0) {
+        update(current.id, (w) => {
+          let next = w;
+          for (const verdict of safe) next = applyOne(verdict.action, next);
+          return next;
+        });
+      }
+      setProposal({ verdicts: data.verdicts, note: data.note });
+    } catch {
+      toast.error("Tidying failed. Nothing was changed.");
+    } finally {
+      setTidyBusy(false);
+    }
+  }, [current, update]);
+
+  const approveDeletion = useCallback(
+    (verdict: Verdict) => {
+      if (!currentId) return;
+      update(currentId, (w) => applyOne(verdict.action, w));
+      setProposal((prev) =>
+        prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
+      );
+    },
+    [currentId, update]
+  );
+
   const rename = useCallback(
     (name: string) => {
       if (!currentId) return;
@@ -648,6 +735,39 @@ export default function Home() {
                   ))}
                 </ul>
               </PanelCard>
+            )}
+
+            <PanelCard title="Folders" defaultOpen flush>
+              <div className="px-[0.625rem]">
+                <ResourceTree
+                  workspace={current!}
+                  onOpen={(analysisId) => {
+                    const el = document.getElementById(`claim-${latest.claims[0]?.ref ?? ""}`);
+                    if (el) el.scrollIntoView({ behavior: "smooth" });
+                    void analysisId;
+                  }}
+                  onNewFolder={addFolder}
+                  onMove={moveResource}
+                  onDelete={deleteResource}
+                  onTidy={() => void tidy()}
+                  tidyBusy={tidyBusy}
+                />
+              </div>
+            </PanelCard>
+
+            {proposal && (
+              <ProposalBar
+                verdicts={proposal.verdicts}
+                note={proposal.note}
+                busy={false}
+                onApprove={approveDeletion}
+                onReject={(verdict) =>
+                  setProposal((prev) =>
+                    prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
+                  )
+                }
+                onDismiss={() => setProposal(null)}
+              />
             )}
 
             <PanelCard title="Workspace" defaultOpen={false}>
