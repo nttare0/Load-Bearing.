@@ -1,4 +1,5 @@
 import type { Analysis } from "./schema";
+import type { Folder, Resource } from "./resources";
 
 /**
  * Workspaces.
@@ -44,6 +45,9 @@ export type Workspace = {
   messages: Message[];
   /** Saved plans, so a report can be traced back to the text that produced it. */
   plans: { id: string; text: string; at: string; title: string }[];
+  /** Folders and the things in them. Shapes live in lib/resources.ts. */
+  folders: Folder[];
+  resources: Resource[];
 };
 
 const KEY = "load-bearing:workspaces";
@@ -57,7 +61,16 @@ export function newId(): string {
 
 export function createWorkspace(name = "Untitled workspace"): Workspace {
   const now = new Date().toISOString();
-  return { id: newId(), name: name.trim() || "Untitled workspace", createdAt: now, updatedAt: now, messages: [], plans: [] };
+  return {
+    id: newId(),
+    name: name.trim() || "Untitled workspace",
+    createdAt: now,
+    updatedAt: now,
+    messages: [],
+    plans: [],
+    folders: [],
+    resources: [],
+  };
 }
 
 /** The title a workspace takes from its first plan, so the rail is never all "Untitled". */
@@ -74,7 +87,12 @@ export function readWorkspaces(): Workspace[] {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isWorkspace);
+    // Workspaces stored before folders existed simply have none.
+    return parsed.filter(isWorkspace).map((w) => ({
+      ...w,
+      folders: Array.isArray(w.folders) ? w.folders : [],
+      resources: Array.isArray(w.resources) ? w.resources : [],
+    }));
   } catch {
     return [];
   }
