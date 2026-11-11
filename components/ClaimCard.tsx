@@ -63,15 +63,38 @@ export function ClaimCard({ claim, claims, onOutcome, canRecord }: Props) {
               {claim.source === "implied" ? (
                 <span className="italic">Implied — the plan never says this out loud.</span>
               ) : (
-                <span>
-                  “{claim.source}”
+                <span className="flex flex-col gap-[0.125rem]">
+                  <span>“{claim.source}”</span>
+                  {claim.sourceStatus === "paraphrase" && (
+                    <span className="text-[0.75rem] not-italic text-[var(--to-warning)]">
+                      Not word for word — this is the model&apos;s paraphrase of the plan.
+                    </span>
+                  )}
                 </span>
               )}
             </p>
           </div>
           <div className="hidden shrink-0 flex-col items-end gap-1 pt-1 sm:flex">
             <ImpactMeter impact={claim.impact} />
-            <span className="lb-mono text-[0.625rem] text-ink-3">impact</span>
+            {/* The band is a word; the number behind it is the measurement. */}
+            <span className="lb-mono text-[0.625rem] text-ink-3" title="impact × uncertainty">
+              {claim.priority.toFixed(1)}
+            </span>
+            <span className="lb-mono text-[0.625rem] text-ink-3">
+              {claim.impact} × {claim.confidence}
+            </span>
+            {claim.audit && (
+              <span
+                className="lb-mono text-[0.625rem] text-[var(--to-warning)]"
+                title="A second scoring run disagreed with the first"
+              >
+                audit: {claim.audit.firstImpact}/{claim.audit.firstConfidence} →{" "}
+                {claim.audit.impact}/{claim.audit.confidence}
+              </span>
+            )}
+            {claim.heuristic && (
+              <span className="lb-mono text-[0.625rem] text-ink-3">no model</span>
+            )}
           </div>
         </div>
 
