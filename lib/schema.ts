@@ -173,6 +173,9 @@ export type FailureMode = z.infer<typeof PreMortemOutputSchema>["failureModes"][
 export type ExtractionOutput = z.infer<typeof ExtractionOutputSchema>;
 export type TestDesignOutput = z.infer<typeof TestDesignOutputSchema>;
 
+/** One pass of the pipeline, and how long it took. */
+export type PassTiming = { stage: string; ms: number };
+
 /** Shape of the SSE events the pipeline streams to the browser. */
 export type PipelineEvent =
   | { type: "stage"; stage: PipelineStage; detail?: string }
@@ -180,7 +183,7 @@ export type PipelineEvent =
   | { type: "failureModes"; failureModes: FailureMode[] }
   | { type: "evidence"; evidence: EvidenceItem[]; notes: string[] }
   | { type: "tests"; claims: Claim[] }
-  | { type: "done"; analysis: Analysis; persisted: boolean }
+  | { type: "done"; analysis: Analysis; persisted: boolean; passes?: PassTiming[] }
   | { type: "error"; message: string };
 
 export type PipelineStage =

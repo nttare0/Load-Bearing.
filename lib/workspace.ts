@@ -26,6 +26,12 @@ export type Message = {
   analysisId?: string;
   /** Set on the turn that only read the workspace and answered in prose. */
   kind?: "report" | "answer" | "error";
+  /**
+   * What each pass cost in wall clock, when the turn produced a report. Kept
+   * with the turn so a slow run is visible after the fact, not only while it
+   * is running.
+   */
+  passes?: { stage: string; ms: number }[];
   /** Naming what this turn looked at, so a thread is auditable. */
   lookedAt?: { analyses: number; claims: number; tested: number };
 };
