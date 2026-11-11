@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { Thread } from "@/components/Thread";
 import { StatusLegend } from "@/components/Report";
 import type { Analysis } from "@/lib/schema";
@@ -26,6 +27,7 @@ export function ThreadWorkspace({
   onDeleteReport,
   onRerun,
   busy,
+  stage,
   composer,
 }: {
   workspace: Workspace | null;
@@ -36,6 +38,8 @@ export function ThreadWorkspace({
   onDeleteReport: (analysisId: string) => void;
   onRerun: (planId: string) => void;
   busy: boolean;
+  /** The pass currently running, already in plain language. */
+  stage?: string | null;
   composer: ReactNode;
 }) {
   if (!workspace) {
@@ -79,6 +83,14 @@ export function ThreadWorkspace({
         onRerun={onRerun}
         busy={busy}
       />
+      {busy && (
+        /* During a run the thread says which pass is running, so the wait has
+           a shape. The composer below is disabled and carries the same text. */
+        <p className="flex items-center gap-[0.375rem] text-[0.8125rem] text-ink-3" role="status">
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          {stage ?? "starting"}
+        </p>
+      )}
       <div className="mx-auto w-full max-w-[42rem]">{composer}</div>
     </div>
   );

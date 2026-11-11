@@ -184,6 +184,7 @@ export default function Home() {
         const decoder = new TextDecoder();
         let buffer = "";
         let done: Analysis | null = null;
+        let donePasses: { stage: string; ms: number }[] | undefined;
 
         while (true) {
           const { value, done: finished } = await reader.read();
@@ -196,13 +197,16 @@ export default function Home() {
             if (!line) continue;
             try {
               const event = JSON.parse(line.slice(6)) as
-                | { type: "done"; analysis: Analysis }
+                | { type: "done"; analysis: Analysis; passes?: { stage: string; ms: number }[] }
                 | { type: "stage"; stage: string; detail?: string }
                 | { type: "error"; message: string };
               // The running pass goes into the composer strip, so the wait is
               // legible without a separate progress panel.
               if (event.type === "stage") setStage(STAGE_LABEL[event.stage] ?? event.stage);
-              if (event.type === "done") done = event.analysis;
+              if (event.type === "done") {
+                done = event.analysis;
+                if (event.passes?.length) donePasses = event.passes;
+              }
               if (event.type === "error") {
                 append({ id: newId(), role: "assistant", kind: "error", text: event.message, at: new Date().toISOString() });
               }
@@ -250,6 +254,7 @@ export default function Home() {
                 text: analysis.title,
                 analysisId: analysis.id,
                 at: new Date().toISOString(),
+                ...(donePasses?.length ? { passes: donePasses } : {}),
               },
             ],
           }));
@@ -572,6 +577,7 @@ export default function Home() {
               onDeleteReport={deleteReport}
               onRerun={rerun}
               busy={busy}
+              stage={stage}
               composer={composer}
             />
             <div ref={endRef} />

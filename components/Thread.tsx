@@ -3,6 +3,7 @@
 import { Fragment } from "react";
 import { FlaskConical, MessageSquare, Search, Sparkles } from "lucide-react";
 import { CollapsibleRow } from "@/components/CollapsibleRow";
+import { PassTrace } from "@/components/PassTrace";
 import { Report } from "@/components/Report";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,8 +104,23 @@ export function Thread({
                 <CollapsibleRow
                   icon={<FlaskConical aria-hidden className="size-3.5 shrink-0 text-ink-3" />}
                   label={analysis.title}
-                  meta={`${analysis.claims.length} claims · run ${analysis.run ?? 1}`}
+                  meta={
+                    <span className="flex items-baseline gap-[0.375rem]">
+                      <span>{analysis.claims.length} claims</span>
+                      <span aria-hidden>·</span>
+                      <span>run {analysis.run ?? 1}</span>
+                      {message.passes && message.passes.length > 0 && (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span>{formatDuration(message.passes.reduce((n, p) => n + p.ms, 0))}</span>
+                        </>
+                      )}
+                    </span>
+                  }
                 >
+                  {message.passes && message.passes.length > 0 && (
+                    <PassTrace passes={message.passes} />
+                  )}
                   <Report
                   analysis={analysis}
                   persisted
@@ -134,4 +150,13 @@ export function Thread({
       })}
     </div>
   );
+}
+
+/** A run's wall clock, short enough for a summary line. */
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 10_000) return `${Math.round(ms / 100) / 10}s`;
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, "0")}s`;
 }

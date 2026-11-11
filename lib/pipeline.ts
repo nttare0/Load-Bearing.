@@ -5,6 +5,7 @@ import {
   TestDesignOutputSchema,
   type Analysis,
   type Claim,
+  type PassTiming,
   type PipelineEvent,
   type RawClaim,
 } from "./schema";
@@ -92,6 +93,16 @@ export async function runPipeline(
 ): Promise<Analysis> {
   const notes: string[] = [];
 
+  // Every pass is timed, so the thread can say what the run cost in wall clock
+  // rather than only what it produced.
+  const passes: PassTiming[] = [];
+  let passStart = Date.now();
+  const markPass = (name: string) => {
+    const now = Date.now();
+    passes.push({ stage: name, ms: now - passStart });
+    passStart = now;
+  };
+
   // ---------- Pass 1: extraction ----------
   //
   // The only pass whose failure used to kill the run. It is now the only pass
@@ -138,6 +149,8 @@ export async function runPipeline(
       },
     };
   }
+
+  markPass("extract");
 
   let stated = normaliseRefs(dedupeClaims(extraction.data.claims)).map((c) => toClaim(c, false));
 
@@ -199,6 +212,7 @@ export async function runPipeline(
       `The hidden-assumption pass failed (${short(error)}), so this report only shows claims the plan states.`
     );
   }
+  markPass("hidden");
 
   let claims = [...stated, ...hiddenClaims];
   claims = rankAndCleanClaims(claims);
@@ -234,6 +248,7 @@ export async function runPipeline(
   } catch (error) {
     notes.push(`Pre-mortem pass failed (${short(error)}). Rankings and tests are unaffected.`);
   }
+  markPass("premortem");
 
   // ---------- Pass 4: scoring audit ----------
   emit({ type: "stage", stage: "score", detail: "Re-scoring every claim against the rubric to catch drift." });
@@ -288,8 +303,10 @@ export async function runPipeline(
   } catch (error) {
     notes.push(`Scoring audit failed (${short(error)}); showing the first pass's scores unverified.`);
   }
+  markPass("score");
 
   // ---------- Web evidence ----------
+  const evidenceStart = Date.now();
   const searchable = claimsWorthSearching(claims);
   if (searchable.length) {
     emit({
@@ -311,6 +328,7 @@ export async function runPipeline(
     claims = rankAndCleanClaims(claims);
     emit({ type: "evidence", evidence: run.evidence, notes: run.notes });
   }
+  passes.push({ stage: "evidence", ms: Date.now() - evidenceStart });
 
   // ---------- Pass 5: test design on the top claims ----------
   emit({
@@ -364,6 +382,7 @@ export async function runPipeline(
   } catch (error) {
     notes.push(`Test-design pass failed (${short(error)}), so claims have no tests yet.`);
   }
+  markPass("tests");
 
   const analysis: Analysis = {
     id: randomUUID(),
@@ -385,7 +404,7 @@ export async function runPipeline(
     }
   }
 
-  emit({ type: "done", analysis, persisted });
+  emit({ type: "done", analysis, persisted, passes });
   return analysis;
 }
 
