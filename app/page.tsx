@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PanelLeft } from "lucide-react";
+import { TopBar } from "@/components/TopBar";
+import { SidePanel, PanelCard, PanelRow } from "@/components/SidePanel";
 import { toast } from "sonner";
 import { Composer } from "@/components/Composer";
 import { assignKeys } from "@/lib/diff";
 import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
 import { WorkspacePanel } from "@/components/WorkspacePanel";
-import { Button } from "@/components/ui/button";
 import { BeamToggle } from "@/components/BeamToggle";
+import { bandLabel } from "@/lib/score";
 import type { Analysis } from "@/lib/schema";
 import {
   createWorkspace,
@@ -25,6 +27,15 @@ import {
 
 const LS_ANALYSES = "load-bearing:analyses";
 
+/** The pipeline's stage ids, said in the words a reader would use. */
+const STAGE_LABEL: Record<string, string> = {
+  extract: "reading the plan",
+  premortem: "looking for what nobody wrote down",
+  score: "scoring on impact × uncertainty",
+  evidence: "checking what can be checked",
+  tests: "designing the cheapest tests",
+};
+
 /** The reports a workspace has produced, in the order they were produced. */
 function reportsOf(workspace: Workspace, analyses: Record<string, Analysis>): Analysis[] {
   return workspace.messages
@@ -32,6 +43,7 @@ function reportsOf(workspace: Workspace, analyses: Record<string, Analysis>): An
     .filter((a): a is Analysis => Boolean(a));
 }
 const LS_PANEL = "load-bearing:panel-open";
+const LS_RAIL = "load-bearing:rail-open";
 
 /**
  * The application shell: workspaces on the left, one thread in the middle.
@@ -54,6 +66,8 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"demo" | "live" | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [railOpen, setRailOpen] = useState(true);
+  const [stage, setStage] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   // ---- load once, from the browser ----
@@ -62,6 +76,7 @@ export default function Home() {
       const stored = localStorage.getItem(LS_ANALYSES);
       if (stored) setAnalyses(JSON.parse(stored) as Record<string, Analysis>);
       setPanelOpen(localStorage.getItem(LS_PANEL) === "1");
+      setRailOpen(localStorage.getItem(LS_RAIL) !== "0");
       setPlans(readPlans());
     } catch {
       // A corrupt cache is not worth a dialog.
@@ -182,7 +197,11 @@ export default function Home() {
             try {
               const event = JSON.parse(line.slice(6)) as
                 | { type: "done"; analysis: Analysis }
+                | { type: "stage"; stage: string; detail?: string }
                 | { type: "error"; message: string };
+              // The running pass goes into the composer strip, so the wait is
+              // legible without a separate progress panel.
+              if (event.type === "stage") setStage(STAGE_LABEL[event.stage] ?? event.stage);
               if (event.type === "done") done = event.analysis;
               if (event.type === "error") {
                 append({ id: newId(), role: "assistant", kind: "error", text: event.message, at: new Date().toISOString() });
@@ -245,6 +264,7 @@ export default function Home() {
         });
       } finally {
         setBusy(false);
+        setStage(null);
       }
     },
     [analyses, append, current, plans, saveAnalyses, update]
@@ -318,6 +338,7 @@ export default function Home() {
         });
       } finally {
         setBusy(false);
+        setStage(null);
       }
     },
     [analyses, append, current]
@@ -435,6 +456,25 @@ export default function Home() {
     });
   }, []);
 
+  const rename = useCallback(
+    (name: string) => {
+      if (!currentId) return;
+      update(currentId, (w) => ({ ...w, name }));
+    },
+    [currentId, update]
+  );
+
+  const toggleRail = useCallback(() => {
+    setRailOpen((prev) => {
+      try {
+        localStorage.setItem(LS_RAIL, prev ? "0" : "1");
+      } catch {
+        // Not worth reporting.
+      }
+      return !prev;
+    });
+  }, []);
+
   // Escape closes the panel, as it would a drawer anywhere else.
   useEffect(() => {
     if (!panelOpen) return;
@@ -444,6 +484,28 @@ export default function Home() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [panelOpen]);
+
+  // The latest report is what the rail describes. It is the same object the
+  // thread renders, so the two can never disagree.
+  const latest = current ? reportsOf(current, analyses).at(-1) : undefined;
+  const threaded = Boolean(current && current.messages.length > 0);
+  const railAvailable = Boolean(threaded && latest);
+
+  const currentTitle = current?.name ?? "Workspace";
+
+  const composer = (
+    <Composer
+      onAnalyze={analyze}
+      onAsk={ask}
+      busy={busy}
+      aiMode={mode}
+      workspaceName={currentTitle}
+      keep={keep}
+      onKeepChange={setKeep}
+      recent={current ? reportsOf(current, analyses).map((a) => ({ id: a.id, title: a.title })) : []}
+      stage={stage}
+    />
+  );
 
   return (
     <div className="relative flex min-h-dvh flex-col">
@@ -458,56 +520,137 @@ export default function Home() {
         onDelete={remove}
       />
 
-      {/* No header bar: the reference keeps the canvas clean and puts the one
-          control it needs in the top-left corner. */}
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between px-[0.75rem] py-[0.625rem]">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="pointer-events-auto size-8 text-ink-3 hover:text-foreground"
-          onClick={togglePanel}
-          aria-label={panelOpen ? "Close workspaces" : "Open workspaces"}
-          aria-expanded={panelOpen}
-        >
-          <PanelLeft className="size-4" />
-        </Button>
-        <BeamToggle />
-      </div>
-
-      <main className="mx-auto flex w-full max-w-[46rem] flex-1 flex-col px-[1rem] pt-[3.75rem] pb-[1.5rem]">
-        <ThreadWorkspace
-          workspace={current}
-          analyses={analyses}
-          prevOf={prevOf}
-          planOf={planOf}
-          onOutcome={recordOutcome}
-          onDeleteReport={deleteReport}
-          onRerun={rerun}
-          busy={busy}
-          composer={
-            <Composer
-              onAnalyze={analyze}
-              onAsk={ask}
-              busy={busy}
-              aiMode={mode}
-              workspaceName={current?.name ?? "Workspace"}
-              keep={keep}
-              onKeepChange={setKeep}
-              recent={current ? reportsOf(current, analyses).map((a) => ({ id: a.id, title: a.title })) : []}
+      <div className="flex flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
+          {threaded ? (
+            <TopBar
+              name={currentTitle}
+              workspaces={workspaces.map((w) => ({
+                id: w.id,
+                name: w.name,
+                reports: reportsOf(w, analyses).length,
+              }))}
+              currentId={currentId}
+              panelOpen={panelOpen}
+              onTogglePanel={togglePanel}
+              railOpen={railOpen}
+              railAvailable={railAvailable}
+              onToggleRail={toggleRail}
+              onRename={rename}
+              onSelect={select}
+              onDelete={remove}
+              onCreate={create}
             />
-          }
-        />
-        <div ref={endRef} />
-      </main>
-    </div>
-  );
-}
+          ) : (
+            /* A new workspace keeps the bare canvas: one control in the corner,
+               the question, the box. Nothing else has happened yet. */
+            <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between px-[0.75rem] py-[0.625rem]">
+              <button
+                type="button"
+                onClick={togglePanel}
+                aria-label={panelOpen ? "Close workspaces" : "Open workspaces"}
+                aria-expanded={panelOpen}
+                className="pointer-events-auto rounded-[var(--to-radius-sm)] p-[0.3125rem] text-ink-3 hover:bg-[var(--to-surface-2)] hover:text-foreground"
+              >
+                <PanelLeft className="size-4" />
+              </button>
+              <BeamToggle />
+            </div>
+          )}
 
-function BeamMark() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden className="size-[1em] shrink-0">
-      <path d="M3 17 10 3l7 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M6.2 11h7.6M10 3v14" fill="none" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
+          <main
+            className={`mx-auto flex w-full max-w-[46rem] flex-1 flex-col px-[1rem] ${
+              threaded ? "pt-[1.25rem]" : "pt-[3.75rem]"
+            } pb-[1.5rem]`}
+          >
+            <ThreadWorkspace
+              workspace={current}
+              analyses={analyses}
+              prevOf={prevOf}
+              planOf={planOf}
+              onOutcome={recordOutcome}
+              onDeleteReport={deleteReport}
+              onRerun={rerun}
+              busy={busy}
+              composer={composer}
+            />
+            <div ref={endRef} />
+          </main>
+        </div>
+
+        {railAvailable && railOpen && latest && (
+          <SidePanel>
+            <PanelCard
+              title="This report"
+              action={
+                <button
+                  type="button"
+                  onClick={toggleRail}
+                  aria-label="Hide details"
+                  className="rounded-[var(--to-radius-sm)] p-[0.125rem] text-ink-3 hover:text-foreground"
+                >
+                  <PanelLeft className="size-3" />
+                </button>
+              }
+            >
+              <p className="line-clamp-3 text-[0.75rem] leading-[1.5] text-ink-2">{latest.summary}</p>
+              <div className="mt-[0.375rem] border-t border-[var(--to-border)] pt-[0.375rem]">
+                <PanelRow label="Claims" value={latest.claims.length} />
+                <PanelRow label="Tests" value={latest.claims.filter((c) => c.test).length} />
+                <PanelRow
+                  label="Tested"
+                  value={latest.claims.filter((c) => c.outcome).length}
+                />
+                <PanelRow label="Run" value={latest.run ?? 1} />
+              </div>
+            </PanelCard>
+
+            <PanelCard title="Load-bearing" defaultOpen>
+              <ol className="flex flex-col gap-[0.25rem]">
+                {latest.claims
+                  .filter((claim) => claim.priority >= 7)
+                  .slice(0, 5)
+                  .map((claim) => (
+                    <li key={claim.id} className="flex items-baseline gap-[0.375rem]">
+                      <a
+                        href={`#claim-${claim.ref}`}
+                        className="lb-mono shrink-0 text-[0.6875rem] text-ink-3 hover:text-foreground"
+                      >
+                        {claim.ref}
+                      </a>
+                      <span className="min-w-0 truncate text-[0.75rem] text-ink-2" title={claim.claim}>
+                        {claim.claim}
+                      </span>
+                      <span className="ml-auto shrink-0 text-[0.6875rem] tabular-nums text-ink-3">
+                        {bandLabel(claim.priority)}
+                      </span>
+                    </li>
+                  ))}
+                {latest.claims.filter((claim) => claim.priority >= 7).length === 0 && (
+                  <li className="text-[0.75rem] text-ink-3">Nothing scores above the middle band.</li>
+                )}
+              </ol>
+            </PanelCard>
+
+            {latest.notes.length > 0 && (
+              <PanelCard title="Notes" defaultOpen>
+                <ul className="flex flex-col gap-[0.25rem]">
+                  {latest.notes.slice(0, 4).map((note) => (
+                    <li key={note} className="text-[0.75rem] leading-[1.5] text-ink-3">
+                      {note}
+                    </li>
+                  ))}
+                </ul>
+              </PanelCard>
+            )}
+
+            <PanelCard title="Workspace" defaultOpen={false}>
+              <PanelRow label="Reports" value={current ? reportsOf(current, analyses).length : 0} />
+              <PanelRow label="AI" value={mode ?? "—"} />
+            </PanelCard>
+          </SidePanel>
+        )}
+      </div>
+    </div>
   );
 }

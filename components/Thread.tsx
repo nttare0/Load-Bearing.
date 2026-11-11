@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment } from "react";
-import { FlaskConical, Search, Sparkles } from "lucide-react";
+import { FlaskConical, MessageSquare, Search, Sparkles } from "lucide-react";
+import { CollapsibleRow } from "@/components/CollapsibleRow";
 import { Report } from "@/components/Report";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,14 +42,15 @@ export function Thread({
       {messages.map((message) => {
         if (message.role === "user") {
           return (
-            <div key={message.id} className="flex flex-col gap-[0.375rem]">
+            <div key={message.id} className="flex flex-col gap-[0.25rem]">
               <div className="flex items-center gap-[0.5rem]">
-                <span className="lb-label text-[0.6875rem]">You</span>
+                <MessageSquare aria-hidden className="size-3.5 shrink-0 text-ink-3" />
+                <span className="text-[0.8125rem] text-ink-3">You</span>
                 <span className="lb-mono text-[0.6875rem] text-ink-3">
                   {new Date(message.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
-              <p className="max-w-[46rem] whitespace-pre-wrap text-[0.9375rem] leading-[1.6] text-foreground">
+              <p className="max-w-[46rem] whitespace-pre-wrap pl-[1.25rem] text-[0.9375rem] leading-[1.6] text-foreground">
                 {message.text}
               </p>
             </div>
@@ -98,15 +100,21 @@ export function Thread({
 
             {analysis && (
               <Fragment>
-                <Report
+                <CollapsibleRow
+                  icon={<FlaskConical aria-hidden className="size-3.5 shrink-0 text-ink-3" />}
+                  label={analysis.title}
+                  meta={`${analysis.claims.length} claims · run ${analysis.run ?? 1}`}
+                >
+                  <Report
                   analysis={analysis}
                   persisted
                   previous={prevOf(analysis.id)}
                   onRerun={planOf(analysis.id) ? () => onRerun(planOf(analysis.id)!) : undefined}
                   rerunBusy={busy}
                   onOutcome={(ref, outcome) => onOutcome(analysis.id, ref, outcome)}
-                  onDelete={() => onDeleteReport(analysis.id)}
-                />
+                    onDelete={() => onDeleteReport(analysis.id)}
+                  />
+                </CollapsibleRow>
               </Fragment>
             )}
 
