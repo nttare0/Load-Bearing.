@@ -2,6 +2,7 @@ import { describeProvider, provider } from "@/lib/ai";
 import { geminiKey, generate, generateStructured } from "@/lib/gemini";
 import { z } from "zod";
 import { storageMode } from "@/lib/store";
+import { mirofishEnabled } from "@/lib/mirofish";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -48,6 +49,9 @@ export async function GET(request: Request) {
     ok: true,
     ...ai,
     storage: await storageMode(),
+    // Skills are named only when they are usable. A tab that always says
+    // "not enabled" is a dead end, so the UI hides what this reports as off.
+    skills: { mirofish: mirofishEnabled() },
     time: new Date().toISOString(),
   });
 }

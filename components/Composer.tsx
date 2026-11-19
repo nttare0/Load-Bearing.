@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, FileUp, FlaskConical, Loader2, Paperclip, Search, ShieldCheck } from "lucide-react";
 import { PromptBox, type PromptEffort } from "@/components/rare/prompt-box";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ export function Composer({
   onKeepChange,
   recent,
   stage,
+  draft,
 }: {
   onAnalyze: (text: string, keep: boolean, effort?: string) => void;
   onAsk: (question: string) => void;
@@ -49,8 +50,15 @@ export function Composer({
   recent: { id: string; title: string }[];
   /** The pipeline stage currently running, when one is. */
   stage?: string | null;
+  /** Text pushed in from outside, e.g. an example chip on the empty state. */
+  draft?: string;
 }) {
   const [text, setText] = useState("");
+  // An example arrives as a new string each time, so the same chip pressed twice
+  // still refills the box after you have cleared it.
+  useEffect(() => {
+    if (draft) setText(draft);
+  }, [draft]);
   const [override, setOverride] = useState<ComposerMode | null>(null);
   const [uploading, setUploading] = useState(false);
   const [attached, setAttached] = useState<string | null>(null);

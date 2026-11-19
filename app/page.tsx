@@ -73,12 +73,16 @@ export default function Home() {
     model: null,
     storage: null,
   });
+  /** The simulation skill, as reported by the server. Off unless it says otherwise. */
+  const [mirofish, setMirofish] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [railOpen, setRailOpen] = useState(true);
 
   const [stage, setStage] = useState<string | null>(null);
   const [proposal, setProposal] = useState<{ verdicts: Verdict[]; note?: string } | null>(null);
   const [tidyBusy, setTidyBusy] = useState(false);
+  /** A plan the page puts in the composer — from an example chip. */
+  const [draftPlan, setDraftPlan] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
   // ---- load once, from the browser ----
@@ -107,9 +111,15 @@ export default function Home() {
 
     fetch("/api/health")
       .then((r) => r.json())
-      .then((data: { ai?: "configured" | "demo"; provider?: string; storage?: string }) => {
+      .then((data: {
+        ai?: "configured" | "demo";
+        provider?: string;
+        storage?: string;
+        skills?: { mirofish?: boolean };
+      }) => {
         setMode(data.ai === "configured" ? "live" : "demo");
         setTools({ model: data.provider ?? null, storage: data.storage ?? null });
+        setMirofish(data.skills?.mirofish === true);
       })
       .catch(() => setMode(null));
   }, []);
@@ -611,6 +621,7 @@ export default function Home() {
       onKeepChange={setKeep}
       recent={current ? reportsOf(current, analyses).map((a) => ({ id: a.id, title: a.title })) : []}
       stage={stage}
+      draft={draftPlan}
     />
   );
 
@@ -668,6 +679,9 @@ export default function Home() {
             busy={busy}
             stage={stage}
             composer={composer}
+            mirofish={mirofish}
+            demo={mode === "demo"}
+            onExample={(text) => setDraftPlan(text)}
           />
           <div ref={endRef} />
         </main>

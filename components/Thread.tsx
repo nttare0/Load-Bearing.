@@ -26,6 +26,7 @@ export function Thread({
   onDeleteReport,
   onRerun,
   busy,
+  mirofish,
 }: {
   messages: Message[];
   analyses: Record<string, Analysis>;
@@ -37,6 +38,8 @@ export function Thread({
   onDeleteReport: (analysisId: string) => void;
   onRerun: (planId: string) => void;
   busy: boolean;
+  /** Whether the simulation skill is enabled on this deployment. */
+  mirofish?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-[1.5rem]">
@@ -122,6 +125,7 @@ export function Thread({
                     <PassTrace passes={message.passes} />
                   )}
                   <Report
+              mirofish={mirofish}
                   analysis={analysis}
                   persisted
                   previous={prevOf(analysis.id)}

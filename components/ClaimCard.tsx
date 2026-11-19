@@ -21,7 +21,10 @@ type Props = {
 export function ClaimCard({ claim, claims, onOutcome, canRecord }: Props) {
   // The result lives on the claim, so a shared link shows it too.
   const outcome = claim.outcome?.result;
-  const [open, setOpen] = useState(false);
+  // Open by default. The test is the only part of a card a person can act on,
+  // and collapsing it put the instruction behind a click while eight pieces of
+  // metadata sat above it.
+  const [open, setOpen] = useState(true);
   const dependencies = claim.dependsOn
     .map((ref) => claims.find((c) => c.ref === ref))
     .filter((c): c is Claim => Boolean(c));
@@ -39,20 +42,15 @@ export function ClaimCard({ claim, claims, onOutcome, canRecord }: Props) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="lb-mono text-[0.75rem] text-ink-3">#{claim.rank}</span>
           <StatusBadge status={claim.status} />
-          <Badge variant="outline">{claim.category}</Badge>
-          <ScoreBadge claim={claim} />
           {outcome === "confirmed" && <Badge variant="fact">tested · holds</Badge>}
           {outcome === "broken" && <Badge variant="contradicted">tested · broken</Badge>}
           {outcome === "inconclusive" && <Badge variant="unverified">tested · unclear</Badge>}
-          {claim.outcome && (
-            <time
-              dateTime={claim.outcome.at}
-              className="lb-mono text-[0.6875rem] text-ink-3"
-              title={new Date(claim.outcome.at).toLocaleString()}
-            >
-              {new Date(claim.outcome.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-            </time>
-          )}
+          <span className="ml-auto flex items-center gap-1">
+            <ImpactMeter impact={claim.impact} />
+            <span className="lb-mono text-[0.625rem] text-ink-3" title="impact × uncertainty">
+              {claim.priority.toFixed(1)}
+            </span>
+          </span>
         </div>
 
         <div className="flex items-start gap-3">
@@ -73,28 +71,6 @@ export function ClaimCard({ claim, claims, onOutcome, canRecord }: Props) {
                 </span>
               )}
             </p>
-          </div>
-          <div className="hidden shrink-0 flex-col items-end gap-1 pt-1 sm:flex">
-            <ImpactMeter impact={claim.impact} />
-            {/* The band is a word; the number behind it is the measurement. */}
-            <span className="lb-mono text-[0.625rem] text-ink-3" title="impact × uncertainty">
-              {claim.priority.toFixed(1)}
-            </span>
-            <span className="lb-mono text-[0.625rem] text-ink-3">
-              {claim.impact} × {claim.confidence}
-            </span>
-            {claim.audit && (
-              <span
-                className="lb-mono text-[0.625rem] text-[var(--to-warning)]"
-                title="A second scoring run disagreed with the first"
-              >
-                audit: {claim.audit.firstImpact}/{claim.audit.firstConfidence} →{" "}
-                {claim.audit.impact}/{claim.audit.confidence}
-              </span>
-            )}
-            {claim.heuristic && (
-              <span className="lb-mono text-[0.625rem] text-ink-3">no model</span>
-            )}
           </div>
         </div>
 
@@ -211,6 +187,31 @@ export function ClaimCard({ claim, claims, onOutcome, canRecord }: Props) {
         ) : (
           <p className="lb-hint text-[0.75rem]">No test yet.</p>
         )}
+
+        {/* The working, in one line, below the thing it explains. */}
+        <p className="flex flex-wrap items-center gap-x-[0.5em] gap-y-[0.125em] text-[0.625rem] text-ink-3">
+          <span>{bandLabel(claim.priority)}</span>
+          <span aria-hidden>·</span>
+          <span>
+            {claim.impact} × {claim.confidence}
+          </span>
+          {claim.audit && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="text-[var(--to-warning)]" title="A second scoring run disagreed with the first">
+                audit {claim.audit.firstImpact}/{claim.audit.firstConfidence} →{" "}
+                {claim.audit.impact}/{claim.audit.confidence}
+              </span>
+            </>
+          )}
+          {claim.heuristic && (
+            <>
+              <span aria-hidden>·</span>
+              <span>scored without a model</span>
+            </>
+          )}
+          <span className="ml-auto lb-mono">{claim.category}</span>
+        </p>
       </div>
     </Card>
   );

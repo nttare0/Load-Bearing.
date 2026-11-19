@@ -14,10 +14,12 @@ import { PriorityChart } from "@/components/PriorityChart";
 import { ProgressPanel } from "@/components/ProgressPanel";
 import { ResearchPanel } from "@/components/ResearchPanel";
 import { RunDiff } from "@/components/RunDiff";
+import { VerdictBanner } from "@/components/VerdictBanner";
 import { StatusBadge } from "@/components/ConfidenceBadge";
 import { toJson, toMarkdown } from "@/lib/export";
 import { downloadPdf } from "@/lib/pdf";
 import { bandLabel } from "@/lib/score";
+import { verdictOf } from "@/lib/verdict";
 import type { Analysis, Claim } from "@/lib/schema";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +35,9 @@ type Props = {
   /** Re-run this plan's latest text. Absent on a shared report. */
   onRerun?: () => void;
   rerunBusy?: boolean;
+  /** Whether the simulation skill is enabled on this deployment. Off by
+   *  default: a tab that only ever says "not enabled" is a dead end. */
+  mirofish?: boolean;
 };
 
 export function Report({
@@ -44,21 +49,28 @@ export function Report({
   previous,
   onRerun,
   rerunBusy = false,
+  mirofish = false,
 }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
-  const [tab, setTab] = useState("ranked");
+  const [tab, setTab] = useState("graph");
 
   /**
    * Clicking a claim in the graph should take you to the claim. The old
    * handler ran a querySelector and threw the result away, so nothing moved.
    */
   const focusClaim = useCallback((claim: Claim) => {
-    setTab("ranked");
-    // The cards mount with the tab, so wait a frame before scrolling.
+    // The cards are on the page itself now, so nothing needs mounting first —
+    // but a frame still lets the browser settle before scrolling.
     requestAnimationFrame(() => {
       document
         .getElementById(`claim-${claim.ref}`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, []);
+
+  const jumpTo = useCallback((ref: string) => {
+    requestAnimationFrame(() => {
+      document.getElementById(`claim-${ref}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   }, []);
 
@@ -74,6 +86,9 @@ export function Report({
   }, [analysis.claims]);
 
   const markdown = useMemo(() => toMarkdown(analysis), [analysis]);
+  // Derived, not authored: the headline at the top of the page is the report's
+  // own top claim in one sentence (lib/verdict.ts).
+  const verdict = useMemo(() => verdictOf(analysis), [analysis]);
 
   const download = useCallback(
     async (kind: "md" | "json" | "pdf") => {
@@ -121,6 +136,12 @@ export function Report({
 
   return (
     <div className="flex flex-col gap-[1rem]">
+      {/* The answer first. Everything below it is the working. */}
+      <VerdictBanner
+        verdict={verdict}
+        onJump={verdict.claim ? () => jumpTo(verdict.claim!.ref) : undefined}
+      />
+
       {/* The title lives in the thread row above, so the report opens straight
           into what it found. */}
       <div className="flex flex-col gap-[0.75rem]">
@@ -196,38 +217,45 @@ export function Report({
         </div>
       )}
 
+      {/* Ranked list is not a tab any more: it is the report. The other views
+          were peers of it, which told a newcomer there were five answers. */}
+      <div className="flex flex-col gap-[0.75rem]">
+        <p className="lb-hint text-[0.75rem]">Ranked by impact × uncertainty.</p>
+        <ProgressPanel analysis={analysis} />
+        <div id={`claim-${analysis.claims[0]?.ref ?? "none"}`} aria-hidden />
+        <details className="group/chart">
+          <summary className="cursor-pointer list-none text-[0.75rem] text-ink-3 hover:text-foreground">
+            Where the weight sits
+          </summary>
+          <div className="pt-[0.5rem]">
+            <PriorityChart claims={analysis.claims} />
+          </div>
+        </details>
+        {analysis.claims.map((claim) => (
+          <div key={claim.id} id={`claim-${claim.ref}`}>
+            <ClaimCard
+              claim={claim}
+              claims={analysis.claims}
+              onOutcome={onOutcome}
+              canRecord={persisted}
+            />
+          </div>
+        ))}
+      </div>
+
+      <details className="group/views rounded-[var(--to-radius)] border border-[var(--to-border)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-[0.5rem] px-[0.875rem] py-[0.625rem] text-[0.8125rem] text-ink-2 hover:text-foreground">
+          <span>Other views</span>
+          <span className="text-[0.6875rem] text-ink-3">dependency map · pre-mortem · report text</span>
+        </summary>
+        <div className="border-t border-[var(--to-border)] px-[0.875rem] pb-[0.875rem]">
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList variant="line">
-          <TabsTrigger value="ranked">Ranked list</TabsTrigger>
           <TabsTrigger value="graph">Dependency map</TabsTrigger>
           <TabsTrigger value="premortem">Pre-mortem</TabsTrigger>
-          <TabsTrigger value="simulate">Simulate</TabsTrigger>
+          {mirofish && <TabsTrigger value="simulate">Simulate</TabsTrigger>}
           <TabsTrigger value="markdown">Report text</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="ranked" className="flex flex-col gap-[0.75rem]">
-          <p className="lb-hint text-[0.75rem]">Ranked by impact × uncertainty.</p>
-          <ProgressPanel analysis={analysis} />
-          <div id={`claim-${analysis.claims[0]?.ref ?? "none"}`} aria-hidden />
-          <details className="group/chart">
-            <summary className="cursor-pointer list-none text-[0.75rem] text-ink-3 hover:text-foreground">
-              Where the weight sits
-            </summary>
-            <div className="pt-[0.5rem]">
-              <PriorityChart claims={analysis.claims} />
-            </div>
-          </details>
-          {analysis.claims.map((claim) => (
-            <div key={claim.id} id={`claim-${claim.ref}`}>
-              <ClaimCard
-                claim={claim}
-                claims={analysis.claims}
-                onOutcome={onOutcome}
-                canRecord={persisted}
-              />
-            </div>
-          ))}
-        </TabsContent>
 
         <TabsContent value="graph">
           <DependencyGraph claims={analysis.claims} onFocus={focusClaim} />
@@ -278,9 +306,11 @@ export function Report({
 
         {/* Beside the report, never inside it: this tab produces predictions,
             and a prediction is not something the report can hold. */}
-        <TabsContent value="simulate">
-          <ResearchPanel claims={analysis.claims} />
-        </TabsContent>
+        {mirofish && (
+          <TabsContent value="simulate">
+            <ResearchPanel claims={analysis.claims} />
+          </TabsContent>
+        )}
 
         <TabsContent value="markdown">
           <div className="relative">
@@ -301,6 +331,8 @@ export function Report({
           </div>
         </TabsContent>
       </Tabs>
+        </div>
+      </details>
 
       <p className="border-t border-border pt-[0.75rem] text-[0.75rem] leading-[1.5] text-ink-3">
         {readOnly
