@@ -3,7 +3,8 @@ import { hasApiKey } from "@/lib/ai";
 import { NOT_A_PLAN_RESPONSE } from "@/lib/prompts";
 import { saveAnalysis } from "@/lib/store";
 import { demoAnalysis } from "@/lib/demo";
-import type { PipelineEvent } from "@/lib/schema";
+import { thinkingFor } from "@/lib/effort";
+import type { Analysis, PipelineEvent } from "@/lib/schema";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -11,7 +12,7 @@ export const maxDuration = 300;
 const MAX_INPUT = 24_000;
 
 export async function POST(request: Request) {
-  let body: { text?: unknown; persist?: unknown };
+  let body: { text?: unknown; persist?: unknown; effort?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
 
   const text = typeof body.text === "string" ? body.text.trim() : "";
   const persist = body.persist === true;
+  // The composer's hold-to-think. Anything unrecognised falls back to the
+  // environment default rather than failing the run.
+  const thinkingLevel = thinkingFor(body.effort);
 
   if (text.length < 40) {
     return Response.json({ error: NOT_A_PLAN_RESPONSE }, { status: 400 });
@@ -46,11 +50,10 @@ export async function POST(request: Request) {
           return;
         }
 
-        await runPipeline(
-          text,
-          send,
-          persist ? { persist: (analysis) => saveAnalysis(analysis) } : {}
-        );
+        await runPipeline(text, send, {
+          ...(persist ? { persist: (analysis: Analysis) => saveAnalysis(analysis) } : {}),
+          ...(thinkingLevel ? { thinkingLevel } : {}),
+        });
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "The analysis failed for an unknown reason.";

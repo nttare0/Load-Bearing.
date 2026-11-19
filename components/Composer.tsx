@@ -1,21 +1,32 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowUp, ChevronDown, FileUp, FlaskConical, Loader2, Paperclip, Search, ShieldCheck } from "lucide-react";
+import { ChevronDown, FileUp, FlaskConical, Loader2, Paperclip, Search, ShieldCheck } from "lucide-react";
+import { PromptBox, type PromptEffort } from "@/components/rare/prompt-box";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 
 /**
  * The composer.
  *
- * Follows the reference's anatomy: a quiet box with a few controls along its
- * bottom edge, the send arrow at the right of that row, and one line of context
- * underneath in its own bordered strip. The context strip is where this app
- * differs — it names the workspace being worked in, because everything else
- * here depends on which plan you are looking at.
+ * Built on the reference prompt box: type a plan and tap send, or hold the
+ * button to charge it — Quick, Think, Think deeply — and let go to send at that
+ * level. The level is not decoration: it is sent with the plan and sets how hard
+ * the model thinks, so holding longer buys more reasoning.
+ *
+ * The strip under the box is where this app differs. It names the workspace the
+ * work lands in, how many reports are already there, and whether the run is live
+ * or demo — state you can read without opening anything.
  */
 
 export type ComposerMode = "analyze" | "ask";
+
+/** The three levels the hold climbs through. Colour is only a hint; the id is
+ *  what the pipeline actually receives. */
+const EFFORTS: PromptEffort[] = [
+  { id: "quick", label: "Quick" },
+  { id: "think", label: "Think", color: "#F5A524" },
+  { id: "deep", label: "Think deeply", color: "#F2552C" },
+];
 
 export function Composer({
   onAnalyze,
@@ -28,7 +39,7 @@ export function Composer({
   recent,
   stage,
 }: {
-  onAnalyze: (text: string, keep: boolean) => void;
+  onAnalyze: (text: string, keep: boolean, effort?: string) => void;
   onAsk: (question: string) => void;
   busy: boolean;
   aiMode: "demo" | "live" | null;
@@ -49,19 +60,11 @@ export function Composer({
   // A short message that asks something is a question; anything else is a plan.
   const guessed: ComposerMode =
     trimmed.length < 400 &&
-    (/\?\s*$/.test(trimmed) || /^(what|why|how|which|should|is|are|can|could|do|does|who)\b/i.test(trimmed))
+    (/\?\s*$/.test(trimmed) ||
+      /^(what|why|how|which|should|is|are|can|could|do|does|who)\b/i.test(trimmed))
       ? "ask"
       : "analyze";
   const mode = override ?? guessed;
-
-  const submit = () => {
-    if (!trimmed || busy) return;
-    if (mode === "ask") onAsk(trimmed);
-    else onAnalyze(trimmed, keep);
-    setText("");
-    setAttached(null);
-    setOverride(null);
-  };
 
   const onFile = async (file: File) => {
     setUploading(true);
@@ -83,49 +86,62 @@ export function Composer({
 
   return (
     <div className="flex flex-col gap-[0.5rem]">
-      <div className="flex flex-col rounded-[0.75rem] border border-[var(--to-border)] bg-[var(--to-surface)] shadow-[0_1px_2px_rgba(16,18,25,0.04)] transition-colors focus-within:border-[var(--to-border-strong)]">
-        <label htmlFor="composer" className="sr-only">
-          Paste a plan, or ask about the work in this workspace
-        </label>
-        <Textarea
-          id="composer"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              submit();
-            }
-          }}
-          placeholder={mode === "ask" ? "Ask about this workspace…" : "Paste a plan, a decision, or an argument…"}
-          rows={2}
-          disabled={busy}
-          className="min-h-[4.25rem] resize-none border-0 bg-transparent px-[0.875rem] pt-[0.75rem] text-[0.9375rem] leading-[1.55] shadow-none focus-visible:ring-0"
-        />
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".pdf,.docx,.md,.txt,text/plain,application/pdf"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void onFile(file);
+          event.target.value = "";
+        }}
+      />
 
-        <div className="flex items-center justify-between gap-[0.5rem] px-[0.5rem] pb-[0.5rem]">
-          <div className="flex min-w-0 items-center gap-[0.125rem]">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".pdf,.docx,.md,.txt,text/plain,application/pdf"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void onFile(file);
-                event.target.value = "";
-              }}
-            />
+      <PromptBox
+        value={text}
+        onValueChange={setText}
+        status={busy ? "streaming" : "idle"}
+        onSubmit={(prompt, effort) => {
+          if (mode === "ask") onAsk(prompt);
+          else onAnalyze(prompt, keep, effort.id);
+          setAttached(null);
+          setOverride(null);
+        }}
+        onStop={() => {
+          // The run keeps going to the end: half an analysis would be a claim
+          // list the app cannot stand behind. Stop only stops the composer's
+          // own waiting, so say so rather than pretending the work halted.
+          document.getElementById("composer-end")?.scrollIntoView({ behavior: "smooth" });
+        }}
+        efforts={EFFORTS}
+        placeholder={
+          mode === "ask"
+            ? ["Ask about this workspace…", "What did the last run get wrong?"]
+            : [
+                "Paste a plan, a decision, or an argument…",
+                "We will open three cafés in Kigali by June…",
+                "One rider, 40 orders a day, 12,000 RWF a meal…",
+              ]
+        }
+        hint={mode === "ask" ? undefined : "Hold to think harder"}
+        className="w-full rounded-[var(--to-radius)] border-[var(--to-border)] bg-[var(--to-surface)] text-foreground dark:text-foreground"
+        actions={
+          <>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="size-7"
+              className="size-7 shrink-0"
               onClick={() => fileRef.current?.click()}
               disabled={busy || uploading}
               aria-label="Attach a file"
             >
-              {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
+              {uploading ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Paperclip className="size-3.5" />
+              )}
             </Button>
 
             {attached && (
@@ -139,25 +155,15 @@ export function Composer({
             <button
               type="button"
               onClick={() => setOverride(mode === "ask" ? "analyze" : "ask")}
-              className="ml-[0.25rem] flex items-center gap-[0.375rem] rounded-[var(--to-radius-sm)] px-[0.375rem] py-[0.25rem] text-[0.8125rem] text-ink-2 hover:bg-[var(--to-surface-2)]"
+              className="flex shrink-0 items-center gap-[0.3125rem] rounded-[var(--to-radius-sm)] px-[0.375rem] py-[0.25rem] text-[0.75rem] text-ink-2 hover:bg-[var(--to-surface-2)]"
             >
               {mode === "ask" ? <Search className="size-3.5" /> : <FlaskConical className="size-3.5" />}
               {mode === "ask" ? "Ask" : "Agent"}
               <ChevronDown className="size-3" />
             </button>
-          </div>
-
-          <Button
-            onClick={submit}
-            disabled={!trimmed || busy}
-            size="icon"
-            className="size-8 shrink-0 rounded-[0.5rem]"
-            aria-label={mode === "ask" ? "Ask" : "Analyse this plan"}
-          >
-            {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* The strip under the box is attached to it, the way the reference
           attaches its repo and branch: state you can read without opening
@@ -168,7 +174,9 @@ export function Composer({
           <span className="max-w-[11rem] truncate text-ink-2">{workspaceName}</span>
         </span>
 
-        <span aria-hidden className="text-[var(--to-border-strong)]">·</span>
+        <span aria-hidden className="text-[var(--to-border-strong)]">
+          ·
+        </span>
 
         <span className="lb-mono shrink-0 text-[0.6875rem]">
           {recent.length} report{recent.length === 1 ? "" : "s"}
@@ -176,8 +184,13 @@ export function Composer({
 
         {busy && stage && (
           <>
-            <span aria-hidden className="text-[var(--to-border-strong)]">·</span>
-            <span className="lb-mono flex min-w-0 items-center gap-[0.25rem] text-[0.6875rem] text-ink-2" role="status">
+            <span aria-hidden className="text-[var(--to-border-strong)]">
+              ·
+            </span>
+            <span
+              className="lb-mono flex min-w-0 items-center gap-[0.25rem] text-[0.6875rem] text-ink-2"
+              role="status"
+            >
               <Loader2 className="size-3 shrink-0 animate-spin" aria-hidden />
               <span className="truncate">{stage}</span>
             </span>
@@ -200,6 +213,7 @@ export function Composer({
           </span>
         </span>
       </div>
+      <div id="composer-end" />
     </div>
   );
 }

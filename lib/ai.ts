@@ -77,6 +77,8 @@ export async function structuredPass<Schema extends z.ZodType>(opts: {
   schema: Schema;
   maxTokens?: number;
   attempts?: number;
+  /** How hard to think. Gemini accepts low | medium | high; Claude ignores it. */
+  thinkingLevel?: string | null;
 }): Promise<StructuredResult<z.infer<Schema>>> {
   if (provider() === "gemini") return geminiPass(opts);
 
@@ -140,6 +142,7 @@ async function geminiPass<Schema extends z.ZodType>(opts: {
   schema: Schema;
   maxTokens?: number;
   attempts?: number;
+  thinkingLevel?: string | null;
 }): Promise<StructuredResult<z.infer<Schema>>> {
   const attempts = opts.attempts ?? 2;
   let lastError: unknown = null;
@@ -152,6 +155,7 @@ async function geminiPass<Schema extends z.ZodType>(opts: {
         user: prompt,
         maxTokens: opts.maxTokens ?? 4096,
         temperature: 0.2,
+        thinkingLevel: opts.thinkingLevel,
       });
       if (result.truncated) {
         throw new Error("the reply was cut off at the token limit");

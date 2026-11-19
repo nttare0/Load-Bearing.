@@ -89,7 +89,11 @@ function hash(text: string): string {
 export async function runPipeline(
   planText: string,
   emit: Emit,
-  opts: { persist?: (analysis: Analysis) => Promise<boolean> } = {}
+  opts: {
+    persist?: (analysis: Analysis) => Promise<boolean>;
+    /** low | medium | high — set by the composer's hold-to-think. */
+    thinkingLevel?: string | null;
+  } = {}
 ): Promise<Analysis> {
   const notes: string[] = [];
 
@@ -116,6 +120,7 @@ export async function runPipeline(
       system: EXTRACTION_PROMPT,
       user: `THE PLAN\n\n${planText}\n\nExtract the claims.`,
       schema: ExtractionOutputSchema,
+      thinkingLevel: opts.thinkingLevel,
       maxTokens: 4096,
     });
   } catch (error) {
@@ -189,6 +194,7 @@ export async function runPipeline(
         `Continue refs after C${Math.max(...stated.map((c) => refIndex(c.ref)), stated.length)}. Return the hidden assumptions.`,
       ].join("\n"),
       schema: ExtractionOutputSchema.omit({ summary: true }),
+      thinkingLevel: opts.thinkingLevel,
       maxTokens: 3072,
     });
 
@@ -239,6 +245,7 @@ export async function runPipeline(
         "Write the pre-mortem.",
       ].join("\n"),
       schema: PreMortemOutputSchema,
+      thinkingLevel: opts.thinkingLevel,
       maxTokens: 2048,
     });
 
@@ -270,6 +277,7 @@ export async function runPipeline(
         "Return the same claims with your independent impact, confidence and status.",
       ].join("\n"),
       schema: ExtractionOutputSchema.omit({ summary: true }),
+      thinkingLevel: opts.thinkingLevel,
       maxTokens: 3000,
     });
 
@@ -357,6 +365,7 @@ export async function runPipeline(
         "One test per claim ref.",
       ].join("\n"),
       schema: TestDesignOutputSchema,
+      thinkingLevel: opts.thinkingLevel,
       maxTokens: 3000,
     });
 

@@ -13,6 +13,9 @@ import {
   Trash2,
   UserRound,
 } from "lucide-react";
+import { AiStatus } from "@/components/rare/ai-status";
+import { AnimatedCounter } from "@/components/rare/animated-counter";
+import { DeleteButton } from "@/components/rare/delete-button";
 import { tree, type Verdict } from "@/lib/resources";
 import type { Workspace } from "@/lib/workspace";
 
@@ -27,12 +30,27 @@ import type { Workspace } from "@/lib/workspace";
  * Nothing here deletes on its own. A deletion arrives in Activity as one line
  * with the model's own reason beside it and two buttons.
  */
+/**
+ * A stage name, in the reference's vocabulary. The status component has its own
+ * drawn icons for thinking, researching, analysing and writing, so the pipeline's
+ * labels only need mapping onto them.
+ */
+function statusState(stage: string): string {
+  const label = stage.toLowerCase();
+  if (/search|research|verif|evidence/.test(label)) return "researching";
+  if (/writ|draft|report|summary|test/.test(label)) return "writing";
+  if (/scor|rank|map|audit|claim/.test(label)) return "analyzing";
+  return "thinking";
+}
+
 export function SideRail({
   workspace,
   workspaces,
   currentId,
   proposal,
   tidyBusy,
+  stage,
+  mode,
   onTidy,
   onApprove,
   onReject,
@@ -49,6 +67,9 @@ export function SideRail({
   currentId: string | null;
   proposal: { verdicts: Verdict[]; note?: string } | null;
   tidyBusy: boolean;
+  /** The pipeline stage running right now, if one is. */
+  stage: string | null;
+  mode: "demo" | "live" | null;
   onTidy: () => void;
   onApprove: (verdict: Verdict) => void;
   onReject: (verdict: Verdict) => void;
@@ -103,6 +124,19 @@ export function SideRail({
 
   return (
     <>
+      {/* What the run is doing, in the reference's inline status: a drawn icon
+          that changes with the work, a shimmering label, and the clock. */}
+      {stage && (
+        <div className="shrink-0 rounded-[var(--to-radius)] border border-[var(--to-border)] px-[0.5rem] py-[0.375rem]">
+          <AiStatus
+            state={statusState(stage)}
+            label={stage}
+            detail={mode === "demo" ? "demo" : undefined}
+            className="h-6 gap-[0.375rem] text-[0.75rem] text-ink-2 dark:text-ink-2"
+          />
+        </div>
+      )}
+
       {/* Card one: the tabbed shelf. Takes the height, scrolls inside. */}
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--to-radius)] border border-[var(--to-border)]">
         <div
@@ -300,21 +334,19 @@ export function SideRail({
                               </span>
                             )}
                           </span>
-                          <span className="flex items-center gap-[0.25rem]">
-                            <button
-                              type="button"
-                              onClick={() => onApprove(verdict)}
-                              className="border border-[var(--to-border-strong)] px-[0.3125rem] py-[0.0625rem] text-[0.625rem] hover:bg-[var(--to-surface-2)]"
-                            >
-                              Delete
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onReject(verdict)}
-                              className="px-[0.25rem] py-[0.0625rem] text-[0.625rem] text-ink-3 hover:text-foreground"
-                            >
-                              Keep
-                            </button>
+                          {/* The bin, from the reference: press it and it opens;
+                              the tick deletes, the cross keeps. Nothing leaves
+                              until one of those two is pressed. */}
+                          <span className="flex items-center gap-[0.375rem]">
+                            <DeleteButton
+                              tile={26}
+                              className="rounded-[var(--to-radius-sm)]"
+                              onConfirm={() => onApprove(verdict)}
+                              onCancel={() => onReject(verdict)}
+                            />
+                            <span className="text-[0.625rem] text-ink-3">
+                              delete, or keep it
+                            </span>
                           </span>
                         </li>
                       ))}
@@ -343,6 +375,12 @@ export function SideRail({
       <section className="shrink-0 rounded-[var(--to-radius)] border border-[var(--to-border)]">
         <div className="flex items-center gap-[0.25rem] px-[0.5rem] py-[0.3125rem]">
           <span className="min-w-0 flex-1 truncate text-[0.75rem] text-ink-2">Workspaces</span>
+          {/* The count rolls rather than jumps when a workspace is added. */}
+          <AnimatedCounter
+            value={workspaces.length}
+            separator=""
+            className="shrink-0 pr-[0.125rem] text-[0.6875rem] text-ink-3 tabular-nums"
+          />
           <button
             type="button"
             onClick={() => setSearching((value) => !value)}
@@ -419,29 +457,19 @@ export function SideRail({
                 </div>
 
                 {deleting && (
-                  <div className="bg-[var(--to-surface)] px-[0.5rem] py-[0.25rem]">
-                    <p className="text-[0.6875rem] leading-[1.5] text-ink-3">
+                  <div className="bg-[var(--to-surface)] px-[0.5rem] py-[0.3125rem]">
+                    <p className="text-[0.625rem] leading-[1.5] text-ink-3">
                       Delete “{w.name}” and the reports in it?
                     </p>
-                    <span className="mt-[0.125rem] flex items-center gap-[0.25rem]">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onDelete(w.id);
-                          setPendingDelete(null);
-                        }}
-                        className="border border-[var(--to-border-strong)] px-[0.3125rem] py-[0.0625rem] text-[0.625rem]"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPendingDelete(null)}
-                        className="px-[0.25rem] py-[0.0625rem] text-[0.625rem] text-ink-3 hover:text-foreground"
-                      >
-                        Keep
-                      </button>
-                    </span>
+                    <DeleteButton
+                      tile={26}
+                      className="mt-[0.1875rem] rounded-[var(--to-radius-sm)]"
+                      onConfirm={() => {
+                        onDelete(w.id);
+                        setPendingDelete(null);
+                      }}
+                      onCancel={() => setPendingDelete(null)}
+                    />
                   </div>
                 )}
               </li>
@@ -453,6 +481,20 @@ export function SideRail({
           )}
         </ul>
       </section>
+
+      {/* Rare UI's licence asks for a visible credit wherever its components
+          ship. This is it. */}
+      <p className="shrink-0 px-[0.25rem] text-[0.625rem] leading-[1.4] text-ink-3">
+        Components from{" "}
+        <a
+          href="https://www.rareui.com"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          Rare UI
+        </a>
+      </p>
     </>
   );
 }
