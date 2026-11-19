@@ -35,22 +35,35 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ args?: string[] }> }
 ) {
+  /**
+   * Every outcome is a 200 with the verdict in the body.
+   *
+   * A diagnostic whose only client reads pages cannot read a 401 or a 500 — it
+   * just sees "failed". Status codes are for the app; this route is a tool, and
+   * a tool should always answer in words.
+   */
+  const answer = (payload: Record<string, unknown>) => Response.json({ tool: "check", ...payload });
+
   const expected = process.env.CHECK_TOKEN;
   if (!expected) {
-    return Response.json(
-      { error: "The check tool is off. Set CHECK_TOKEN in the deployment's env to enable it." },
-      { status: 404 }
-    );
+    return answer({ ok: false, enabled: false, reason: "CHECK_TOKEN is not set on this deployment." });
   }
 
   const { args = [] } = await context.params;
   const [token, ...rest] = args;
 
   if (!token || !sameSecret(token, expected)) {
-    return Response.json(
-      { error: "That token is not the one this deployment expects." },
-      { status: 401 }
-    );
+    return answer({
+      ok: false,
+      enabled: true,
+      reason: "That token is not the one this deployment expects.",
+      // Lengths only: enough to tell a stale value from a missing one, with no
+      // way to recover either secret from it.
+      diagnostics: {
+        receivedLength: token?.length ?? 0,
+        expectedLength: expected.length,
+      },
+    });
   }
 
   // No path given, or a query string used instead: default to the cheap check.
@@ -60,16 +73,15 @@ export async function GET(
 
   const target = toTarget(segments);
   if (!target) {
-    return Response.json(
-      {
-        error:
-          "The path after the token must be one of this app's /api routes, e.g. /api/check/<token>/api/selftest",
-      },
-      { status: 400 }
-    );
+    return answer({
+      ok: false,
+      reason:
+        "The path after the token must be one of this app's /api routes, e.g. /api/check/<token>/api/selftest",
+      routes: ["/api/health", "/api/selftest", "/api/selftest/full"],
+    });
   }
 
-  return run(target);
+  return answer(await run(target));
 }
 
 /**
@@ -95,14 +107,11 @@ function toTarget(segments: string[]): string | null {
   return `/${path.join("/")}${params ? `?${params}` : ""}`;
 }
 
-async function run(path: string): Promise<Response> {
+async function run(path: string): Promise<Record<string, unknown>> {
   const started = Date.now();
   const port = process.env.PORT;
   if (!port) {
-    return Response.json(
-      { error: "No PORT in the environment; cannot reach this deployment itself." },
-      { status: 500 }
-    );
+    return { ok: false, reason: "No PORT in the environment; cannot reach this deployment itself." };
   }
 
   const target = `http://127.0.0.1:${port}${path}`;
@@ -120,7 +129,7 @@ async function run(path: string): Promise<Response> {
     const status = marker ? Number(marker[1]) : null;
     const body = marker && marker.index !== undefined ? out.slice(0, marker.index) : out;
 
-    return Response.json({
+    return {
       target: path,
       status,
       ms: Date.now() - started,
@@ -131,17 +140,14 @@ async function run(path: string): Promise<Response> {
       // curl's own words when the request never completed — a platform 401 looks
       // nothing like a model error, so keep them apart.
       transport: err.trim().slice(0, 500) || null,
-    });
+    };
   } catch (error) {
-    return Response.json(
-      {
-        target: path,
-        ok: false,
-        ms: Date.now() - started,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 }
-    );
+    return {
+      target: path,
+      ok: false,
+      ms: Date.now() - started,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
