@@ -1,5 +1,5 @@
 import { MODEL, describeProvider, hasApiKey, structuredPass } from "@/lib/ai";
-import { GEMINI_MODELS, generate } from "@/lib/gemini";
+import { GEMINI_MODELS } from "@/lib/gemini";
 import { ExtractionOutputSchema } from "@/lib/schema";
 import { runPipeline } from "@/lib/pipeline";
 import type { PipelineEvent } from "@/lib/schema";
@@ -126,39 +126,72 @@ export async function GET(
   }
 
   if (route === "models") {
-    // Ask each candidate model one trivial question and report what it says.
-    // The fallback chain hides a missing model behind a working answer, so the
-    // only way to see the difference is to ask each one directly.
-    const results = await Promise.all(
-      GEMINI_MODELS.map(async (name) => {
-        const started = Date.now();
-        try {
-          const reply = await generate({
-            system: "Answer with one word.",
-            user: "Say OK.",
-            maxTokens: 16,
-            temperature: 0,
-            thinkingLevel: "",
-          });
-          return {
-            model: name,
-            ok: true,
-            answered: reply.model,
-            ms: Date.now() - started,
-            text: reply.text.slice(0, 40),
-            tokens: { in: reply.inputTokens, out: reply.outputTokens },
-          };
-        } catch (error) {
-          return {
-            model: name,
-            ok: false,
-            ms: Date.now() - started,
-            error: error instanceof Error ? error.message.slice(0, 300) : String(error),
-          };
+    /**
+     * Ask each model directly, with no fallback in the way.
+     *
+     * A diagnostic that runs through the code it is diagnosing can only ever
+     * say "something worked". This posts the same body the app posts and reports
+     * the raw status and the raw error for each model.
+     */
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) return answer({ ok: false, reason: "no GEMINI_API_KEY" });
+
+    const ask = async (model: string, thinking: string | null) => {
+      const started = Date.now();
+      const body: Record<string, unknown> = {
+        contents: [{ role: "user", parts: [{ text: "Say OK." }] }],
+        generationConfig: {
+          maxOutputTokens: 32,
+          temperature: 0,
+          ...(thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}),
+        },
+      };
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(60_000),
         }
-      })
-    );
-    return answer({ ok: true, asked: "which models answer", configured: MODEL(), results });
+      );
+      const payload = (await res.json().catch(() => ({}))) as {
+        error?: { message?: string; status?: string };
+        candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
+        modelVersion?: string;
+      };
+      const text = (payload.candidates?.[0]?.content?.parts ?? [])
+        .map((part) => part.text ?? "")
+        .join("")
+        .trim();
+      return {
+        model,
+        thinking,
+        status: res.status,
+        ms: Date.now() - started,
+        answeredBy: payload.modelVersion ?? null,
+        text: text.slice(0, 40),
+        finish: payload.candidates?.[0]?.finishReason ?? null,
+        error: payload.error?.message ?? null,
+      };
+    };
+
+    const configured = MODEL();
+    // One call per model, with the thinking level the app would send, and one
+    // with thinking removed — that separates "the model is unavailable" from
+    // "the model does not accept the parameter we send it".
+    const results = [];
+    for (const name of GEMINI_MODELS) {
+      results.push(await ask(name, "low"));
+      results.push(await ask(name, null));
+    }
+    return answer({
+      ok: results.some((r) => r.status === 200),
+      asked: "each model, with and without thinking",
+      configured,
+      thinkingDefault: process.env.GEMINI_THINKING ?? null,
+      results,
+    });
   }
 
   if (route === "extract") {
