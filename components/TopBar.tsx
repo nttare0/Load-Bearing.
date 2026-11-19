@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 /**
  * The threaded view's top line: which workspace you are in on the left, and the
- * two panel toggles on the right.
+ * rail toggle on the right.
  *
  * It is a bar only when there is a thread to host. An empty workspace keeps the
  * bare canvas the reference uses for a new conversation, where the only control
@@ -54,7 +54,7 @@ export function TopBar({
             size="icon"
             className="size-7 text-ink-3 hover:text-foreground"
             onClick={onToggleRail}
-            aria-label={railOpen ? "Hide details" : "Show details"}
+            aria-label={railOpen ? "Hide the rail" : "Show the rail"}
             aria-expanded={railOpen}
           >
             <PanelsTopLeft className="size-4" />
