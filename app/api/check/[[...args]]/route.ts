@@ -1,35 +1,44 @@
-import { spawn } from "node:child_process";
+import { describeProvider, hasApiKey, structuredPass } from "@/lib/ai";
+import { ExtractionOutputSchema } from "@/lib/schema";
+import { runPipeline } from "@/lib/pipeline";
+import type { PipelineEvent } from "@/lib/schema";
 
 /**
- * Run a check inside the deployment, with the deployment's own environment.
+ * Ask the deployment, in its own words, whether its model works.
  *
- * The problem this solves: production holds the only Gemini key, the sandbox has
- * no key and cannot reach googleapis.com, and it cannot POST to the deployment
- * either. So the one question worth asking — "does the key Vercel holds actually
- * return valid claims?" — could not be asked from anywhere.
+ * The question this exists to answer: production holds the only model key, and
+ * nobody outside can reach it — the sandbox has no key and cannot make an HTTPS
+ * request to the deployment at all, and every page reader available shouts "failed"
+ * for any status code it did not expect. So the only place this can be asked is
+ * inside, and the only thing worth asking is the one thing health cannot say:
+ * does the key Vercel holds actually return schema-valid claims?
  *
- * Everything travels in the path, because the only transport available to an
- * outside checker may not be able to carry a query string or a body:
+ *   GET /api/check/<token>            environment: provider, model, key present
+ *   GET /api/check/<token>/extract    one real extraction pass on a fixed sample
+ *   GET /api/check/<token>/pipeline   all five passes on the same sample
  *
- *   GET /api/check/<token>                          → /api/health (default)
- *   GET /api/check/<token>/api/selftest             → just the first pass
- *   GET /api/check/<token>/api/selftest/full        → the whole five-pass run
+ * Off unless CHECK_TOKEN is set. Everything happens in-process — a deployment
+ * cannot reliably reach itself over localhost, and it should not have to.
  *
- * The target is spawned as a child of this same function, so it inherits the
- * real environment — a request from outside would too, but this keeps the
- * platform's own protection out of the way and makes the result one document.
- *
- * Off unless CHECK_TOKEN is set. Wrong token → 401. Anything that is not one of
- * this app's own /api paths → 400, so it cannot become an open proxy.
+ * Nothing is persisted: the store gets no `persist`, so a check can never leave
+ * a sample analysis behind in someone's workspace.
  */
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-/** As much of the child's output as the caller can use, and no more. */
-const MAX_OUTPUT = 24_000;
-/** Hard stop. The child usually finishes well before this. */
-const TIMEOUT_MS = 280_000;
+const SAMPLE = `We are launching a subscription meal-prep service for remote workers in Kigali.
+
+The plan: one kitchen, four rotating menus, delivery between 11:00 and 13:00 on weekdays.
+We will charge 45,000 RWF per month for 20 lunches, which undercuts the restaurants our
+customers use today by about 30%. Our unit cost is 1,100 RWF per meal, so gross margin is
+roughly 50% before delivery.
+
+We expect 400 subscribers within six months based on the size of the coworking community.
+Two riders can cover the whole city. We will not need a permit because we are cooking from
+a home kitchen. Customers will prepay monthly, so we do not need working capital.
+
+The founder has cooked professionally for three years and has 900 Instagram followers.`;
 
 export async function GET(
   request: Request,
@@ -38,132 +47,149 @@ export async function GET(
   /**
    * Every outcome is a 200 with the verdict in the body.
    *
-   * A diagnostic whose only client reads pages cannot read a 401 or a 500 — it
-   * just sees "failed". Status codes are for the app; this route is a tool, and
-   * a tool should always answer in words.
+   * A diagnostic whose only clients read pages cannot read a 401 or a 500 — they
+   * just see "failed", with no clue which failure. Status codes are for the app;
+   * this route is a tool, and a tool answers in words.
    */
   const answer = (payload: Record<string, unknown>) => Response.json({ tool: "check", ...payload });
 
   const expected = process.env.CHECK_TOKEN;
   if (!expected) {
-    return answer({ ok: false, enabled: false, reason: "CHECK_TOKEN is not set on this deployment." });
+    return answer({
+      ok: false,
+      enabled: false,
+      reason: "CHECK_TOKEN is not set on this deployment, so the check is off.",
+    });
   }
 
   const { args = [] } = await context.params;
-  const [token, ...rest] = args;
+  const [token, ...rest] = args.flatMap((a) => a.split("/")).filter(Boolean);
 
   if (!token || !sameSecret(token, expected)) {
     return answer({
       ok: false,
       enabled: true,
       reason: "That token is not the one this deployment expects.",
-      // Lengths only: enough to tell a stale value from a missing one, with no
-      // way to recover either secret from it.
-      diagnostics: {
-        receivedLength: token?.length ?? 0,
-        expectedLength: expected.length,
-      },
+      // Lengths only: enough to tell a stale value from an unset one, and not
+      // enough to recover either secret.
+      diagnostics: { receivedLength: token?.length ?? 0, expectedLength: expected.length },
     });
   }
 
-  // No path given, or a query string used instead: default to the cheap check.
-  const url = new URL(request.url);
-  const queryPath = url.searchParams.get("path");
-  const segments = rest.length > 0 ? rest : queryPath ? [queryPath] : ["api", "health"];
+  const route = rest[0] ?? "env";
 
-  const target = toTarget(segments);
-  if (!target) {
+  if (route === "env") {
+    return answer({
+      ok: true,
+      env: {
+        vercelEnv: process.env.VERCEL_ENV ?? null,
+        region: process.env.VERCEL_REGION ?? null,
+        commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
+      },
+      ...describeProvider(),
+      keyPresent: hasApiKey(),
+      storage: process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY ? "supabase" : "local",
+    });
+  }
+
+  if (!hasApiKey()) {
     return answer({
       ok: false,
-      reason:
-        "The path after the token must be one of this app's /api routes, e.g. /api/check/<token>/api/selftest",
-      routes: ["/api/health", "/api/selftest", "/api/selftest/full"],
+      reason: "No model key on this deployment — nothing to test.",
+      ...describeProvider(),
     });
   }
 
-  return answer(await run(target));
-}
-
-/**
- * `/token/api/selftest` → `/api/selftest`; `/token/api/health` → `/api/health`.
- * A trailing "full" turns the single-pass self-test into the whole pipeline,
- * since a path segment is the only place a parameter can live on this transport.
- */
-function toTarget(segments: string[]): string | null {
-  const parts = segments.flatMap((segment) => segment.split("/")).filter(Boolean);
-  if (parts[0] !== "api" || parts.length < 2) return null;
-  // Only routes this app actually has. A wildcard would be an open proxy.
-  const allowed = new Set(["health", "selftest", "analyze", "organize", "ask"]);
-  if (!allowed.has(parts[1])) return null;
-
-  const query: string[] = [];
-  const path = parts.slice(0, 2);
-  for (const extra of parts.slice(2)) {
-    if (parts[1] === "selftest" && extra === "full") continue;
-    if (parts[1] === "selftest" && extra === "extract") query.push("only=extract");
-    else return null;
+  if (route === "extract") {
+    const started = Date.now();
+    try {
+      const pass = await structuredPass({
+        system: "You extract the assumptions a plan rests on.",
+        user: `THE PLAN\n\n${SAMPLE}\n\nExtract the claims the author states.`,
+        schema: ExtractionOutputSchema,
+        maxTokens: 4096,
+      });
+      return answer({
+        ok: pass.data.claims.length > 0,
+        asked: "one extraction pass",
+        ms: Date.now() - started,
+        ...describeProvider(),
+        modelAnswered: pass.model,
+        claims: pass.data.claims.length,
+        summary: pass.data.summary?.slice(0, 200) ?? null,
+        tokens: { in: pass.inputTokens, out: pass.outputTokens },
+        retries: pass.retries,
+        sample: pass.data.claims.slice(0, 4).map((c) => ({
+          ref: c.ref,
+          status: c.status,
+          impact: c.impact,
+          claim: c.claim.slice(0, 110),
+        })),
+      });
+    } catch (error) {
+      return answer({
+        ok: false,
+        asked: "one extraction pass",
+        ms: Date.now() - started,
+        ...describeProvider(),
+        error: error instanceof Error ? error.message.slice(0, 600) : String(error),
+      });
+    }
   }
-  const params = new URLSearchParams(query.join("&")).toString();
-  return `/${path.join("/")}${params ? `?${params}` : ""}`;
-}
 
-async function run(path: string): Promise<Record<string, unknown>> {
-  const started = Date.now();
-  const port = process.env.PORT;
-  if (!port) {
-    return { ok: false, reason: "No PORT in the environment; cannot reach this deployment itself." };
-  }
+  if (route === "pipeline") {
+    const started = Date.now();
+    const stages: { stage: string; ms: number }[] = [];
+    const errors: { stage: string; message: string }[] = [];
+    let current = "start";
+    let mark = started;
+    let claims = 0;
+    let tests = 0;
+    let evidence = 0;
 
-  const target = `http://127.0.0.1:${port}${path}`;
-  // Vercel's own protection would otherwise answer 401 before the route runs.
-  // This header proves the request came from inside this deployment.
-  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    try {
+      const analysis = await runPipeline(SAMPLE, (event: PipelineEvent) => {
+        if (event.type === "error") {
+          errors.push({ stage: current, message: event.message.slice(0, 300) });
+          return;
+        }
+        if (event.type !== "stage") return;
+        const now = Date.now();
+        stages.push({ stage: current, ms: now - mark });
+        current = event.stage;
+        mark = now;
+      });
+      claims = analysis.claims.length;
+      tests = analysis.claims.filter((c) => c.test).length;
+      evidence = analysis.claims.filter((c) => (c.evidence?.length ?? 0) > 0).length;
+    } catch (error) {
+      return answer({
+        ok: false,
+        asked: "all five passes",
+        ms: Date.now() - started,
+        ...describeProvider(),
+        stages,
+        errors,
+        error: error instanceof Error ? error.message.slice(0, 600) : String(error),
+      });
+    }
 
-  const args = ["-s", "-S", "-m", String(Math.floor(TIMEOUT_MS / 1000)), "-w", "\\n__STATUS__%{http_code}"];
-  if (bypass) args.push("-H", `x-vercel-protection-bypass: ${bypass}`);
-  args.push(target);
-
-  try {
-    const { out, err, code } = await exec("curl", args);
-    const marker = out.match(/__STATUS__(\d{3})\s*$/);
-    const status = marker ? Number(marker[1]) : null;
-    const body = marker && marker.index !== undefined ? out.slice(0, marker.index) : out;
-
-    return {
-      target: path,
-      status,
+    return answer({
+      ok: claims > 0 && errors.length === 0,
+      asked: "all five passes",
       ms: Date.now() - started,
-      ok: status !== null && status >= 200 && status < 300,
-      exit: code,
-      bypass: Boolean(bypass),
-      body: body.slice(0, MAX_OUTPUT),
-      // curl's own words when the request never completed — a platform 401 looks
-      // nothing like a model error, so keep them apart.
-      transport: err.trim().slice(0, 500) || null,
-    };
-  } catch (error) {
-    return {
-      target: path,
-      ok: false,
-      ms: Date.now() - started,
-      error: error instanceof Error ? error.message : String(error),
-    };
+      ...describeProvider(),
+      stages,
+      errors,
+      claims,
+      withTest: tests,
+      withEvidence: evidence,
+    });
   }
-}
 
-function exec(cmd: string, args: string[]): Promise<{ out: string; err: string; code: number | null }> {
-  return new Promise((resolve) => {
-    const child = spawn(cmd, args, { timeout: TIMEOUT_MS });
-    let out = "";
-    let err = "";
-    child.stdout.on("data", (chunk: Buffer) => {
-      if (out.length < MAX_OUTPUT * 2) out += chunk.toString("utf8");
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      err += chunk.toString("utf8");
-    });
-    child.on("error", (error) => resolve({ out, err: err + String(error), code: null }));
-    child.on("close", (code) => resolve({ out, err, code }));
+  return answer({
+    ok: false,
+    reason: "Unknown check. Use the token alone, /extract, or /pipeline.",
   });
 }
 
