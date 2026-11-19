@@ -1,4 +1,5 @@
-import { describeProvider, hasApiKey, structuredPass } from "@/lib/ai";
+import { MODEL, describeProvider, hasApiKey, structuredPass } from "@/lib/ai";
+import { GEMINI_MODELS, generate } from "@/lib/gemini";
 import { ExtractionOutputSchema } from "@/lib/schema";
 import { runPipeline } from "@/lib/pipeline";
 import type { PipelineEvent } from "@/lib/schema";
@@ -100,6 +101,42 @@ export async function GET(
     });
   }
 
+  if (route === "models") {
+    // Ask each candidate model one trivial question and report what it says.
+    // The fallback chain hides a missing model behind a working answer, so the
+    // only way to see the difference is to ask each one directly.
+    const results = await Promise.all(
+      GEMINI_MODELS.map(async (name) => {
+        const started = Date.now();
+        try {
+          const reply = await generate({
+            system: "Answer with one word.",
+            user: "Say OK.",
+            maxTokens: 16,
+            temperature: 0,
+            thinkingLevel: "",
+          });
+          return {
+            model: name,
+            ok: true,
+            answered: reply.model,
+            ms: Date.now() - started,
+            text: reply.text.slice(0, 40),
+            tokens: { in: reply.inputTokens, out: reply.outputTokens },
+          };
+        } catch (error) {
+          return {
+            model: name,
+            ok: false,
+            ms: Date.now() - started,
+            error: error instanceof Error ? error.message.slice(0, 300) : String(error),
+          };
+        }
+      })
+    );
+    return answer({ ok: true, asked: "which models answer", configured: MODEL(), results });
+  }
+
   if (route === "extract") {
     const started = Date.now();
     try {
@@ -189,7 +226,7 @@ export async function GET(
 
   return answer({
     ok: false,
-    reason: "Unknown check. Use the token alone, /extract, or /pipeline.",
+    reason: "Unknown check. Use the token alone, /models, /extract, or /pipeline.",
   });
 }
 
