@@ -56,7 +56,14 @@ export async function GET(request: Request) {
   });
 }
 
-async function checkGemini(): Promise<{ ran: boolean; ok: boolean; ms: number; error?: string }> {
+async function checkGemini(): Promise<{
+  ran: boolean;
+  ok: boolean;
+  ms: number;
+  answeredBy?: string;
+  substituted?: { asked: string; answered: string; reason: string };
+  error?: string;
+}> {
   if (!geminiKey()) return { ran: false, ok: false, ms: 0, error: "no key" };
   if (provider() !== "gemini") return { ran: false, ok: false, ms: 0, error: "gemini is not the active provider" };
 
@@ -67,6 +74,11 @@ async function checkGemini(): Promise<{ ran: boolean; ok: boolean; ms: number; e
       ran: true,
       ok: result.text.length > 0,
       ms: Date.now() - started,
+      // Which model actually answered. The fallback chain means this can differ
+      // from the configured model, and a health check that reports the
+      // configured name while a different model answers is not a health check.
+      answeredBy: result.model,
+      ...(result.substitution ? { substituted: result.substitution } : {}),
       ...(result.text.length ? {} : { error: "the model returned an empty reply" }),
     };
   } catch (error) {
@@ -77,14 +89,29 @@ async function checkGemini(): Promise<{ ran: boolean; ok: boolean; ms: number; e
   }
 }
 
-async function checkGeminiSchema(): Promise<{ ran: boolean; ok: boolean; ms: number; text?: string; error?: string }> {
+async function checkGeminiSchema(): Promise<{
+  ran: boolean;
+  ok: boolean;
+  ms: number;
+  answeredBy?: string;
+  substituted?: { asked: string; answered: string; reason: string };
+  text?: string;
+  error?: string;
+}> {
   const started = Date.now();
   try {
     const result = await generateStructured(
       z.object({ verdict: z.enum(["ok", "not-ok"]), word: z.string() }),
       { user: 'Answer with verdict "ok" and word "ok".', maxTokens: 512, temperature: 0 }
     );
-    return { ran: true, ok: result.data.verdict === "ok", ms: Date.now() - started, text: JSON.stringify(result.data) };
+    return {
+      ran: true,
+      ok: result.data.verdict === "ok",
+      ms: Date.now() - started,
+      answeredBy: result.model,
+      ...(result.substitution ? { substituted: result.substitution } : {}),
+      text: JSON.stringify(result.data),
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ran: true, ok: false, ms: Date.now() - started, error: clean(message) };

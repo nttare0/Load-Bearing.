@@ -1,7 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
-import { geminiKey, geminiModel, geminiProject, GEMINI_MODELS, generate, generateStructured } from "./gemini";
+import {
+  geminiKey,
+  geminiModel,
+  geminiProject,
+  GEMINI_MODELS,
+  generate,
+  generateStructured,
+  takeModelSubstitution,
+} from "./gemini";
 
 /**
  * Thin wrapper around one structured AI call: ask, validate, retry once
@@ -61,6 +69,13 @@ export function client(): Anthropic {
 export type StructuredResult<T> = {
   data: T;
   model: string;
+  /**
+   * Set when the answer did not come from the model that was asked for. A
+   * fallback that nobody mentions reads as a normal report in the UI while a
+   * lighter model is doing the thinking, which is the one kind of downgrade a
+   * tool like this must not hide.
+   */
+  substitution?: { asked: string; answered: string; reason: string };
   inputTokens: number;
   outputTokens: number;
   retries: number;
@@ -160,9 +175,13 @@ async function geminiPass<Schema extends z.ZodType>(opts: {
       if (result.truncated) {
         throw new Error("the reply was cut off at the token limit");
       }
+      // Clear per-call state from earlier passes, then read this call's own.
+      takeModelSubstitution();
+      const substitution = result.substitution ?? takeModelSubstitution() ?? undefined;
       return {
         data: result.data as z.infer<Schema>,
         model: result.model,
+        ...(substitution ? { substitution } : {}),
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
         retries: attempt,

@@ -240,6 +240,7 @@ export async function GET(
     let claims = 0;
     let tests = 0;
     let evidence = 0;
+    let detail: Record<string, unknown> = {};
 
     try {
       const analysis = await runPipeline(SAMPLE, (event: PipelineEvent) => {
@@ -256,6 +257,18 @@ export async function GET(
       claims = analysis.claims.length;
       tests = analysis.claims.filter((c) => c.test).length;
       evidence = analysis.claims.filter((c) => (c.evidence?.length ?? 0) > 0).length;
+      // The notes are the report's honesty: what was skipped, what failed, what
+      // was downgraded. A count of claims says nothing about whether the user
+      // is being told the truth, so they travel with the counts.
+      detail = {
+        title: analysis.title,
+        summary: analysis.summary.slice(0, 300),
+        notes: analysis.notes,
+        statuses: analysis.claims.reduce<Record<string, number>>((acc, c) => {
+          acc[c.status] = (acc[c.status] ?? 0) + 1;
+          return acc;
+        }, {}),
+      };
     } catch (error) {
       return answer({
         ok: false,
@@ -278,6 +291,7 @@ export async function GET(
       claims,
       withTest: tests,
       withEvidence: evidence,
+      ...detail,
     });
   }
 
