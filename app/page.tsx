@@ -11,7 +11,7 @@ import { Composer } from "@/components/Composer";
 import { assignKeys } from "@/lib/diff";
 import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
-import { SideRail } from "@/components/SideRail";
+import { RailCollapseButton, SideRail } from "@/components/SideRail";
 import { BeamToggle } from "@/components/BeamToggle";
 import { bandLabel } from "@/lib/score";
 import type { Analysis } from "@/lib/schema";
@@ -67,6 +67,12 @@ export default function Home() {
   const [keep, setKeep] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"demo" | "live" | null>(null);
+  // What the server is actually wired to, for the connectors card. Named from
+  // the health response, never guessed: an absent provider reads as absent.
+  const [tools, setTools] = useState<{ model: string | null; storage: string | null }>({
+    model: null,
+    storage: null,
+  });
   const [hydrated, setHydrated] = useState(false);
   const [railOpen, setRailOpen] = useState(true);
 
@@ -101,7 +107,10 @@ export default function Home() {
 
     fetch("/api/health")
       .then((r) => r.json())
-      .then((data: { ai?: "configured" | "demo" }) => setMode(data.ai === "configured" ? "live" : "demo"))
+      .then((data: { ai?: "configured" | "demo"; provider?: string; storage?: string }) => {
+        setMode(data.ai === "configured" ? "live" : "demo");
+        setTools({ model: data.provider ?? null, storage: data.storage ?? null });
+      })
       .catch(() => setMode(null));
   }, []);
 
@@ -664,20 +673,25 @@ export default function Home() {
         </main>
       </div>
 
-      {/* The rail: files on top, workspaces under it. It folds away on its own
-          width rather than unmounting, so nothing jumps when it closes. */}
+      {/* The rail. It folds away on its own width rather than unmounting, so
+          nothing jumps or leaves a divider behind when it closes. */}
       <div
         className={`hidden shrink-0 justify-end overflow-hidden border-l transition-[width,opacity,border-color] duration-200 ease-out md:flex ${
           railOpen
-            ? "w-[16.5rem] border-[var(--to-border)] opacity-100"
+            ? "w-[15rem] border-[var(--to-border)] opacity-100"
             : "pointer-events-none w-0 border-transparent opacity-0"
         }`}
       >
         <aside
-          aria-label="Files and workspaces"
+          aria-label="Files, workspaces and connectors"
           aria-hidden={!railOpen}
-          className="flex w-[16.5rem] shrink-0 flex-col gap-[0.5rem] px-[0.5rem] py-[0.5rem]"
+          className="flex w-[15rem] shrink-0 flex-col gap-[0.5rem] px-[0.5rem] pb-[0.5rem] pt-[0.375rem]"
         >
+          {/* The reference's collapse affordance: two chevrons pointing out of
+              the panel, sat above the cards rather than inside them. */}
+          <div className="flex justify-end">
+            <RailCollapseButton onClick={toggleRail} />
+          </div>
           <SideRail
             workspace={current}
             workspaces={workspaces.map((w) => ({
@@ -689,6 +703,7 @@ export default function Home() {
             tidyBusy={tidyBusy}
             stage={busy ? stage ?? null : null}
             mode={mode}
+            tools={tools}
             onTidy={() => void tidy()}
             onApprove={approveDeletion}
             onReject={(verdict) =>
