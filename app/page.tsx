@@ -1,18 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PanelLeft } from "lucide-react";
+import { PanelsTopLeft } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 
-import { ProposalBar } from "@/components/ProposalBar";
 import { applyOne, resourceFromAnalysis, type Verdict } from "@/lib/resources";
-import { SidePanel, PanelCard, PanelRow } from "@/components/SidePanel";
+
 import { toast } from "sonner";
 import { Composer } from "@/components/Composer";
 import { assignKeys } from "@/lib/diff";
 import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
-import { Sidebar } from "@/components/Sidebar";
+import { SideRail } from "@/components/SideRail";
 import { BeamToggle } from "@/components/BeamToggle";
 import { bandLabel } from "@/lib/score";
 import type { Analysis } from "@/lib/schema";
@@ -47,7 +46,6 @@ function reportsOf(workspace: Workspace, analyses: Record<string, Analysis>): An
 }
 const LS_PANEL = "load-bearing:panel-open";
 const LS_RAIL = "load-bearing:rail-open";
-const LS_SIDEBAR = "load-bearing:sidebar-collapsed";
 
 /**
  * The application shell: workspaces on the left, one thread in the middle.
@@ -71,7 +69,7 @@ export default function Home() {
   const [mode, setMode] = useState<"demo" | "live" | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [railOpen, setRailOpen] = useState(true);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   const [stage, setStage] = useState<string | null>(null);
   const [proposal, setProposal] = useState<{ verdicts: Verdict[]; note?: string } | null>(null);
   const [tidyBusy, setTidyBusy] = useState(false);
@@ -84,7 +82,6 @@ export default function Home() {
       if (stored) setAnalyses(JSON.parse(stored) as Record<string, Analysis>);
       setPanelOpen(localStorage.getItem(LS_PANEL) === "1");
       setRailOpen(localStorage.getItem(LS_RAIL) !== "0");
-      setSidebarCollapsed(localStorage.getItem(LS_SIDEBAR) === "1");
       setPlans(readPlans());
     } catch {
       // A corrupt cache is not worth a dialog.
@@ -584,7 +581,9 @@ export default function Home() {
   // thread renders, so the two can never disagree.
   const latest = current ? reportsOf(current, analyses).at(-1) : undefined;
   const threaded = Boolean(current && current.messages.length > 0);
-  const railAvailable = Boolean(threaded && latest);
+  // The rail is the only way to your files and your workspaces, so it is
+  // always available — including in an empty workspace with no report yet.
+  const railAvailable = true;
 
   const currentTitle = current?.name ?? "Workspace";
 
@@ -604,200 +603,104 @@ export default function Home() {
 
   return (
     <div className="relative flex min-h-dvh">
-      {/* The sidebar is the left column now, as on the reference: moving between
-          pieces of work is what you do most, so it stays visible. */}
-      <Sidebar
-        workspaces={workspaces.map((w) => ({ workspace: w, reports: reportsOf(w, analyses).length }))}
-        currentId={currentId}
-        onSelect={select}
-        onCreate={create}
-        onDelete={remove}
-        onNewChat={() => {
-          const workspace = createWorkspace();
-          persist([...workspaces, workspace]);
-          select(workspace.id);
-        }}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={() => {
-          setSidebarCollapsed((prev) => {
-            try {
-              localStorage.setItem(LS_SIDEBAR, prev ? "0" : "1");
-            } catch {
-              // Not worth reporting.
-            }
-            return !prev;
-          });
-        }}
-        onNewFolder={(workspaceId, name) =>
-          update(workspaceId, (w) => applyOne({ action: "create_folder", name }, w))
-        }
-        onOpenResource={(workspaceId, analysisId) => {
-          if (workspaceId !== currentId) select(workspaceId);
-          requestAnimationFrame(() => {
-            document.getElementById(`claim-${analysisId}`)?.scrollIntoView({ behavior: "smooth" });
-          });
-        }}
-        onFileChanged={(workspaceId, resourceId, folderId) =>
-          update(workspaceId, (w) => applyOne({ action: "move", resourceId, folderId }, w))
-        }
-      />
-
-      <div className="flex min-w-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col">
-          {threaded ? (
-            <TopBar
-              name={currentTitle}
-              workspaces={workspaces.map((w) => ({
-                id: w.id,
-                name: w.name,
-                reports: reportsOf(w, analyses).length,
-              }))}
-              currentId={currentId}
-              railOpen={railOpen}
-              railAvailable={railAvailable}
-              onToggleRail={toggleRail}
-              onRename={rename}
-              onSelect={select}
-              onDelete={remove}
-              onCreate={create}
-            />
-          ) : (
-            /* A new workspace keeps the bare canvas: one control in the corner,
-               the question, the box. Nothing else has happened yet. */
-            <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between px-[0.75rem] py-[0.625rem] md:pl-[16.5rem]">
-              <span className="pointer-events-auto">
-                <BeamToggle />
-              </span>
-            </div>
-          )}
-
-          <main
-            className={`mx-auto flex w-full max-w-[46rem] flex-1 flex-col px-[1rem] ${
-              threaded ? "pt-[1.25rem]" : "pt-[3.75rem]"
-            } pb-[1.5rem]`}
-          >
-            <ThreadWorkspace
-              workspace={current}
-              analyses={analyses}
-              prevOf={prevOf}
-              planOf={planOf}
-              onOutcome={recordOutcome}
-              onDeleteReport={deleteReport}
-              onRerun={rerun}
-              busy={busy}
-              stage={stage}
-              composer={composer}
-            />
-            <div ref={endRef} />
-          </main>
-        </div>
-
-        {railAvailable && railOpen && latest && (
-          <SidePanel>
-            <PanelCard
-              title="This report"
-              action={
-                <button
-                  type="button"
-                  onClick={toggleRail}
-                  aria-label="Hide details"
-                  className="rounded-[var(--to-radius-sm)] p-[0.125rem] text-ink-3 hover:text-foreground"
-                >
-                  <PanelLeft className="size-3" />
-                </button>
-              }
+      <div className="flex min-w-0 flex-1 flex-col">
+        {threaded ? (
+          <TopBar
+            name={currentTitle}
+            workspaces={workspaces.map((w) => ({
+              id: w.id,
+              name: w.name,
+              reports: reportsOf(w, analyses).length,
+            }))}
+            currentId={currentId}
+            railOpen={railOpen}
+            railAvailable={railAvailable}
+            onToggleRail={toggleRail}
+            onRename={rename}
+            onSelect={select}
+            onDelete={remove}
+            onCreate={create}
+          />
+        ) : (
+          /* A new workspace keeps the bare canvas: the question and the box. */
+          <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-end gap-[0.375rem] px-[0.75rem] py-[0.625rem]">
+            <button
+              type="button"
+              onClick={toggleRail}
+              aria-label={railOpen ? "Hide the rail" : "Show the rail"}
+              aria-expanded={railOpen}
+              className="pointer-events-auto rounded-[var(--to-radius-sm)] p-[0.3125rem] text-ink-3 hover:bg-[var(--to-surface-2)] hover:text-foreground"
             >
-              <p className="line-clamp-3 text-[0.75rem] leading-[1.5] text-ink-2">{latest.summary}</p>
-              <div className="mt-[0.375rem] border-t border-[var(--to-border)] pt-[0.375rem]">
-                <PanelRow label="Claims" value={latest.claims.length} />
-                <PanelRow label="Tests" value={latest.claims.filter((c) => c.test).length} />
-                <PanelRow
-                  label="Tested"
-                  value={latest.claims.filter((c) => c.outcome).length}
-                />
-                <PanelRow label="Run" value={latest.run ?? 1} />
-              </div>
-            </PanelCard>
-
-            <PanelCard title="Load-bearing" defaultOpen>
-              <ol className="flex flex-col gap-[0.25rem]">
-                {latest.claims
-                  .filter((claim) => claim.priority >= 7)
-                  .slice(0, 5)
-                  .map((claim) => (
-                    <li key={claim.id} className="flex items-baseline gap-[0.375rem]">
-                      <a
-                        href={`#claim-${claim.ref}`}
-                        className="lb-mono shrink-0 text-[0.6875rem] text-ink-3 hover:text-foreground"
-                      >
-                        {claim.ref}
-                      </a>
-                      <span className="min-w-0 truncate text-[0.75rem] text-ink-2" title={claim.claim}>
-                        {claim.claim}
-                      </span>
-                      <span className="ml-auto shrink-0 text-[0.6875rem] tabular-nums text-ink-3">
-                        {bandLabel(claim.priority)}
-                      </span>
-                    </li>
-                  ))}
-                {latest.claims.filter((claim) => claim.priority >= 7).length === 0 && (
-                  <li className="text-[0.75rem] text-ink-3">Nothing scores above the middle band.</li>
-                )}
-              </ol>
-            </PanelCard>
-
-            {latest.notes.length > 0 && (
-              <PanelCard title="Notes" defaultOpen>
-                <ul className="flex flex-col gap-[0.25rem]">
-                  {latest.notes.slice(0, 4).map((note) => (
-                    <li key={note} className="text-[0.75rem] leading-[1.5] text-ink-3">
-                      {note}
-                    </li>
-                  ))}
-                </ul>
-              </PanelCard>
-            )}
-
-            <PanelCard
-              title="Files"
-              defaultOpen
-              action={
-                <button
-                  type="button"
-                  onClick={() => void tidy()}
-                  disabled={tidyBusy}
-                  className="rounded-[var(--to-radius-sm)] px-[0.1875rem] text-[0.6875rem] text-ink-3 hover:text-foreground disabled:opacity-40"
-                >
-                  {tidyBusy ? "tidying…" : "tidy"}
-                </button>
-              }
-            >
-              <p className="text-[0.75rem] leading-[1.5] text-ink-3">
-                Folders and files live in the sidebar, on the left.
-              </p>
-            </PanelCard>
-
-            {proposal && (
-              <ProposalBar
-                verdicts={proposal.verdicts}
-                note={proposal.note}
-                busy={false}
-                onApprove={approveDeletion}
-                onReject={(verdict) =>
-                  setProposal((prev) =>
-                    prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
-                  )
-                }
-                onDismiss={() => setProposal(null)}
-              />
-            )}
-
-            <PanelCard title="Workspace" defaultOpen={false}>
-              <PanelRow label="Reports" value={current ? reportsOf(current, analyses).length : 0} />
-              <PanelRow label="AI" value={mode ?? "—"} />
-            </PanelCard>
-          </SidePanel>
+              <PanelsTopLeft className="size-4" />
+            </button>
+            <span className="pointer-events-auto">
+              <BeamToggle />
+            </span>
+          </div>
         )}
+
+        <main
+          className={`mx-auto flex w-full max-w-[46rem] flex-1 flex-col px-[1rem] ${
+            threaded ? "pt-[1.25rem]" : "pt-[3.75rem]"
+          } pb-[1.5rem]`}
+        >
+          <ThreadWorkspace
+            workspace={current}
+            analyses={analyses}
+            prevOf={prevOf}
+            planOf={planOf}
+            onOutcome={recordOutcome}
+            onDeleteReport={deleteReport}
+            onRerun={rerun}
+            busy={busy}
+            stage={stage}
+            composer={composer}
+          />
+          <div ref={endRef} />
+        </main>
+      </div>
+
+      {/* The rail: files on top, workspaces under it. It folds away on its own
+          width rather than unmounting, so nothing jumps when it closes. */}
+      <div
+        className={`hidden shrink-0 justify-end overflow-hidden border-l transition-[width,opacity,border-color] duration-200 ease-out md:flex ${
+          railOpen
+            ? "w-[16.5rem] border-[var(--to-border)] opacity-100"
+            : "pointer-events-none w-0 border-transparent opacity-0"
+        }`}
+      >
+        <aside
+          aria-label="Files and workspaces"
+          aria-hidden={!railOpen}
+          className="flex w-[16.5rem] shrink-0 flex-col gap-[0.5rem] px-[0.5rem] py-[0.5rem]"
+        >
+          <SideRail
+            workspace={current}
+            workspaces={workspaces.map((w) => ({
+              workspace: w,
+              reports: reportsOf(w, analyses).length,
+            }))}
+            currentId={currentId}
+            proposal={proposal}
+            tidyBusy={tidyBusy}
+            onTidy={() => void tidy()}
+            onApprove={approveDeletion}
+            onReject={(verdict) =>
+              setProposal((prev) =>
+                prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
+              )
+            }
+            onDismissProposal={() => setProposal(null)}
+            onNewFolder={addFolder}
+            onOpenResource={(analysisId) =>
+              document.getElementById(`claim-${analysisId}`)?.scrollIntoView({ behavior: "smooth" })
+            }
+            onFileChanged={moveResource}
+            onSelect={select}
+            onNewChat={create}
+            onDelete={remove}
+          />
+        </aside>
       </div>
     </div>
   );
