@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ChevronRight,
   ChevronsRight,
@@ -16,6 +16,7 @@ import {
 import { AiStatus } from "@/components/rare/ai-status";
 import { AnimatedCounter } from "@/components/rare/animated-counter";
 import { DeleteButton } from "@/components/rare/delete-button";
+import { ConnectorList, useConnectors } from "@/components/Connectors";
 import { tree, type Verdict } from "@/lib/resources";
 import type { Workspace } from "@/lib/workspace";
 
@@ -100,9 +101,6 @@ export function SideRail({
   const [draft, setDraft] = useState("");
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
-  // Read after mount so the server's HTML and the client's first render agree.
-  const [onVercel, setOnVercel] = useState(false);
-  useEffect(() => setOnVercel(/\.vercel\.app$/.test(window.location.hostname)), []);
 
   const term = query.trim().toLowerCase();
   const shown = term
@@ -132,6 +130,8 @@ export function SideRail({
     setCreating(false);
   };
 
+  const connectors = useConnectors({ mode, model: tools.model, storage: tools.storage });
+
   const view = workspace ? tree(workspace) : null;
   const empty = !view || (view.root.length === 0 && view.folders.every((f) => f.items.length === 0));
 
@@ -151,7 +151,9 @@ export function SideRail({
       )}
 
       {/* Files and Activity: the card that takes the height and scrolls inside. */}
-      <section className={`${CARD} flex min-h-0 flex-1 flex-col overflow-hidden`}>
+      {/* Bounded rather than greedy: the reference's card is about twenty rows
+          tall, and letting it eat the column pushed Connectors off-screen. */}
+      <section className={`${CARD} flex min-h-0 flex-col overflow-hidden`}>
         <div role="tablist" aria-label="Files and activity" className="flex shrink-0 gap-[0.375rem] p-[0.25rem]">
           <Tab id="files" label="Files" active={tab === "files"} onSelect={setPicked} />
           <Tab
@@ -199,7 +201,7 @@ export function SideRail({
               </div>
             )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto py-[0.1875rem]">
+            <div className="max-h-[13.5rem] min-h-[4.5rem] overflow-y-auto py-[0.1875rem]">
               {empty && !creating && (
                 <p className="px-[0.625rem] py-[0.375rem] text-[0.8125rem] leading-[1.5] text-ink-3">
                   Reports and notes collect here once you run a plan. Make a folder to keep them
@@ -276,7 +278,7 @@ export function SideRail({
             </div>
           </>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="max-h-[13.5rem] overflow-y-auto">
             <button
               type="button"
               onClick={onTidy}
@@ -474,42 +476,12 @@ export function SideRail({
         </ul>
       </section>
 
-      {/* Connectors: what this deployment is actually wired to. A row says
-          "on" only when the server reported it configured; nothing here is
-          decoration, so a missing key reads as not connected. */}
+      {/* Connectors: what this deployment is actually wired to. */}
       <section className={`${CARD} shrink-0`}>
         <div className={HEAD_ROW}>
           <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-ink-2">Connectors</span>
         </div>
-        <ul className="border-t border-[var(--to-border)] py-[0.1875rem]">
-          <ConnectorRow
-            label="GitHub"
-            detail="source"
-            on={REPO !== null}
-            icon={<GithubMark />}
-          />
-          <ConnectorRow
-            label="Vercel"
-            detail="hosting"
-            on={onVercel}
-            icon={<VercelMark />}
-          />
-          <ConnectorRow
-            label={tools.model ? titleCase(tools.model) : "Model"}
-            detail={mode === "live" ? "live" : mode === "demo" ? "no key" : "unknown"}
-            on={mode === "live"}
-            icon={<SparkMark />}
-          />
-          <ConnectorRow
-            label={tools.storage && tools.storage !== "local" ? titleCase(tools.storage) : "Storage"}
-            detail={tools.storage === "local" ? "this device" : (tools.storage ?? "unknown")}
-            on={Boolean(tools.storage && tools.storage !== "local")}
-            icon={<StoreMark />}
-          />
-        </ul>
-        <p className="border-t border-[var(--to-border)] px-[0.625rem] py-[0.3125rem] text-[0.6875rem] leading-[1.4] text-ink-3">
-          Connected apps are read from the server, not assumed.
-        </p>
+        <ConnectorList connectors={connectors} />
       </section>
 
       {/* Rare UI's licence asks for a visible credit wherever its components
@@ -601,85 +573,6 @@ function IconButton({
     >
       {children}
     </button>
-  );
-}
-
-function ConnectorRow({
-  label,
-  detail,
-  on,
-  icon,
-}: {
-  label: string;
-  detail: string;
-  on: boolean;
-  icon: ReactNode;
-}) {
-  return (
-    <li className="flex items-center gap-[0.5rem] px-[0.625rem] py-[0.3125rem]">
-      <span className="flex size-4 shrink-0 items-center justify-center text-ink-2">{icon}</span>
-      <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-ink-2">{label}</span>
-      <span className="shrink-0 text-[0.6875rem] text-ink-3">{detail}</span>
-      <span
-        aria-label={on ? "connected" : "not connected"}
-        title={on ? "connected" : "not connected"}
-        className={`size-[0.375rem] shrink-0 rounded-full ${
-          on ? "bg-[var(--to-success)]" : "border border-[var(--to-border-strong)]"
-        }`}
-      />
-    </li>
-  );
-}
-
-/** The repo the source link in the header already points at. Kept in one
- *  place so the connectors card cannot claim a connection the app lacks. */
-const REPO = "https://github.com/nttare0/Load-Bearing.";
-
-function titleCase(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-/** GitHub's mark, drawn rather than fetched. */
-function GithubMark() {
-  return (
-    <svg viewBox="0 0 16 16" width={14} height={14} aria-hidden fill="currentColor">
-      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-2.91-.88-2.91-2.71 0-.54.19-1.03.51-1.4-.05-.13-.23-.67.05-1.39 0 0 .42-.13 1.36.51a4.7 4.7 0 0 1 1.25-.17c.43 0 .86.06 1.25.17.94-.64 1.36-.51 1.36-.51.28.72.1 1.26.05 1.39.32.37.51.86.51 1.4 0 1.84-1.13 2.51-2.92 2.71.29.25.55.73.55 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
-    </svg>
-  );
-}
-
-/** Vercel's triangle, drawn rather than fetched. */
-function VercelMark() {
-  return (
-    <svg viewBox="0 0 16 16" width={13} height={13} aria-hidden fill="currentColor">
-      <path d="M8 1.5 15 14H1L8 1.5Z" />
-    </svg>
-  );
-}
-
-function SparkMark() {
-  return (
-    <svg viewBox="0 0 16 16" width={13} height={13} aria-hidden fill="currentColor">
-      <path d="M8 1c.3 3.2 1.4 5.4 3 6.7 1.1.9 2.4 1.3 4 1.3-3.2.3-5.4 1.4-6.7 3-.9 1.1-1.3 2.4-1.3 4-.3-3.2-1.4-5.4-3-6.7C2.9 8.4 1.6 8 .1 8c3.2-.3 5.4-1.4 6.7-3C7.7 3.9 8 2.6 8 1Z" />
-    </svg>
-  );
-}
-
-function StoreMark() {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      width={13}
-      height={13}
-      aria-hidden
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.4}
-    >
-      <ellipse cx="8" cy="4" rx="5.5" ry="2.2" />
-      <path d="M2.5 4v8c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V4" />
-      <path d="M2.5 8c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2" />
-    </svg>
   );
 }
 
