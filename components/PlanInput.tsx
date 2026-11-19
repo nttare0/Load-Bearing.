@@ -7,32 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { DEMO_PLAN_TEXT } from "@/lib/demo";
+import { EXAMPLES } from "@/lib/examples";
 
 type Props = {
   onSubmit: (text: string, persist: boolean) => void;
   busy: boolean;
 };
-
-const EXAMPLES: { label: string; text: string }[] = [
-  { label: "Budgeting app", text: DEMO_PLAN_TEXT },
-  {
-    label: "Pricing change",
-    text: `We're moving our project-management tool from $12 per seat to $29 per workspace, unlimited seats.
-
-Most of our customers have between 2 and 4 seats, so for them this is roughly a 40% price drop. The ones on 8+ seats get a much bigger bill, but those are only about 12% of accounts.
-
-We think the smaller accounts will upgrade immediately, and the big ones will grumble but stay because migrating a workspace is painful. Support will handle the complaints in a week or two. If this works, revenue per account should roughly double.`,
-  },
-  {
-    label: "An argument",
-    text: `Remote work has permanently reduced demand for downtown office space, and cities should convert it to housing.
-
-Three years of occupancy data show downtown office vacancy above 18% in most large US cities, and tenants are renewing for less space than before. Companies have already invested in remote tooling and their employees do not want to return five days a week. Landlords will accept conversion because an empty building costs money.
-
-Conversion is expensive but the buildings are structurally suitable, and cities can speed it up by loosening zoning. The main thing we would need is a tax incentive, which pays for itself through the new residents.`,
-  },
-];
 
 export function PlanInput({ onSubmit, busy }: Props) {
   const [text, setText] = useState("");
