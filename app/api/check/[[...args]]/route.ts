@@ -112,7 +112,7 @@ export async function GET(
       signal: AbortSignal.timeout(30_000),
     });
     const payload = (await res.json().catch(() => ({}))) as {
-      models?: { name?: string; supportedActions?: string[] }[];
+      models?: { name?: string; supportedGenerationMethods?: string[] }[];
       error?: { message?: string };
     };
     return answer({
@@ -120,9 +120,8 @@ export async function GET(
       status: res.status,
       error: payload.error?.message ?? null,
       models: (payload.models ?? [])
-        .filter((m) => (m.supportedActions ?? []).includes("generateContent"))
-        .map((m) => (m.name ?? "").replace(/^models\//, ""))
-        .filter((name) => name.includes("flash") || name.includes("pro")),
+        .filter((m) => (m.supportedGenerationMethods ?? []).includes("generateContent"))
+        .map((m) => (m.name ?? "").replace(/^models\//, "")),
     });
   }
 
