@@ -22,6 +22,7 @@ import { claimsWorthSearching, gatherEvidence, byRef } from "./evidence";
 import { judgeSource } from "./quotes";
 import { heuristicClaims } from "./heuristic";
 import { structuredPass } from "./ai";
+import { substitutionNote } from "./gemini";
 
 /**
  * The five-pass pipeline. Each pass has one job, and results are emitted as
@@ -96,6 +97,15 @@ export async function runPipeline(
   } = {}
 ): Promise<Analysis> {
   const notes: string[] = [];
+  /**
+   * Every pass that silently ran on a fallback model. Collected rather than
+   * printed per pass, because it is one fact about the run: the model on the
+   * box was not the model that did the work.
+   */
+  const swaps = new Map<string, { asked: string; answered: string; reason: string }>();
+  const noteSwap = (result: { substitution?: { asked: string; answered: string; reason: string } }) => {
+    if (result.substitution) swaps.set(`${result.substitution.asked}→${result.substitution.answered}`, result.substitution);
+  };
 
   // Every pass is timed, so the thread can say what the run cost in wall clock
   // rather than only what it produced.
@@ -114,7 +124,10 @@ export async function runPipeline(
   // so, which is more useful than an error page over a working rubric.
   emit({ type: "stage", stage: "extract", detail: "Reading the plan and quoting the claims it states." });
 
-  let extraction: { data: { summary: string; claims: RawClaim[] } };
+  let extraction: {
+    data: { summary: string; claims: RawClaim[] };
+    substitution?: { asked: string; answered: string; reason: string };
+  };
   try {
     extraction = await structuredPass({
       system: EXTRACTION_PROMPT,
@@ -123,6 +136,7 @@ export async function runPipeline(
       thinkingLevel: opts.thinkingLevel,
       maxTokens: 4096,
     });
+    noteSwap(extraction);
   } catch (error) {
     // A model that cannot answer is a reason to say less, not to stop.
     const fallback = heuristicClaims(planText);
@@ -197,6 +211,7 @@ export async function runPipeline(
       thinkingLevel: opts.thinkingLevel,
       maxTokens: 3072,
     });
+    noteSwap(hidden);
 
     const usedRefs = new Set(stated.map((c) => c.ref));
     hiddenClaims = hidden.data.claims
@@ -248,6 +263,7 @@ export async function runPipeline(
       thinkingLevel: opts.thinkingLevel,
       maxTokens: 2048,
     });
+    noteSwap(premortem);
 
     const refs = new Set(claims.map((c) => c.ref));
     failureModes = premortem.data.failureModes.filter((f) => refs.has(f.claimRef));
@@ -281,6 +297,7 @@ export async function runPipeline(
       maxTokens: 3000,
     });
 
+    noteSwap(audit);
     const audits = new Map(audit.data.claims.map((c) => [c.ref.toUpperCase(), c]));
     claims = claims.map((c) => {
       const auditClaim = audits.get(c.ref);
@@ -368,6 +385,7 @@ export async function runPipeline(
       thinkingLevel: opts.thinkingLevel,
       maxTokens: 3000,
     });
+    noteSwap(tests);
 
     const byClaim = new Map(tests.data.tests.map((t) => [t.ref.toUpperCase(), t]));
     claims = claims.map((c) => {
@@ -392,6 +410,10 @@ export async function runPipeline(
     notes.push(`Test-design pass failed (${short(error)}), so claims have no tests yet.`);
   }
   markPass("tests");
+
+  // One sentence per distinct swap. It goes first in the notes because it is
+  // the fact that changes how everything after it should be read.
+  for (const swap of swaps.values()) notes.unshift(substitutionNote(swap));
 
   const analysis: Analysis = {
     id: randomUUID(),

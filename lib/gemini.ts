@@ -48,6 +48,51 @@ export function geminiModel(): string {
  * Five passes at medium is five times the latency for answers that a schema was
  * always going to constrain anyway. Override with GEMINI_THINKING=medium.
  */
+/**
+ * The model a call was asked for, and the model that actually answered.
+ *
+ * The fallback chain below is right: a busy model should not fail a report. But
+ * it was silent, and silence turns a degraded report into a normal one. When
+ * gemini-3.8-flash is out of quota and gemini-3.5-flash-lite answers instead,
+ * the user is reading a weaker model's work while the UI names the stronger
+ * one. So the swap is recorded here and surfaces in `notes`.
+ */
+let lastSubstitution: { asked: string; answered: string; reason: string } | null = null;
+
+/** The most recent substitution, or null if the last call used the model asked for. */
+export function takeModelSubstitution(): { asked: string; answered: string; reason: string } | null {
+  const value = lastSubstitution;
+  lastSubstitution = null;
+  return value;
+}
+
+/** Why a model was passed over, with the provider's own words when it gave any. */
+function reasonFor(error: { message?: string } | undefined): string {
+  const message = error?.message ?? "";
+  if (/quota|rate limit|resource.?exhausted|429/i.test(message)) {
+    const retry = message.match(/retry in ([^.]+)\./i);
+    return retry ? `out of quota, retry in ${retry[1].trim()}` : "out of quota";
+  }
+  if (/high demand|overloaded|503/i.test(message)) return "temporarily overloaded";
+  if (/not found|not supported|does not exist|no longer available/i.test(message)) {
+    return "not available to this key";
+  }
+  return "refused the request";
+}
+
+/**
+ * The plain-language sentence that goes in the report's notes.
+ *
+ * The parenthetical is dropped when there is no reason to give: "not
+ * gemini-3.8-flash ()." is the kind of half-finished sentence that makes a
+ * reader distrust the whole note.
+ */
+export function substitutionNote(swap: { asked: string; answered: string; reason: string }): string {
+  const why = swap.reason.trim();
+  const because = why ? ` (${why})` : "";
+  return `Answers came from ${swap.answered}, not ${swap.asked}${because}. The report is real, but it is a lighter model's reading of the plan.`;
+}
+
 export function geminiThinking(): string {
   return process.env.GEMINI_THINKING ?? "low";
 }
@@ -76,6 +121,8 @@ export type GeminiCall = {
 export type GeminiResult = {
   text: string;
   model: string;
+  /** Set when the model that answered is not the model that was asked for. */
+  substitution?: { asked: string; answered: string; reason: string };
   inputTokens: number;
   outputTokens: number;
   /** True when the reply was truncated, so callers can say so rather than
@@ -88,6 +135,8 @@ export async function generate(opts: GeminiCall): Promise<GeminiResult> {
   if (!key) throw new Error("GEMINI_API_KEY is not set");
 
   let model = geminiModel();
+  const asked = model;
+  let why: string | null = null;
   const body: Record<string, unknown> = {
     systemInstruction: opts.system ? { parts: [{ text: opts.system }] } : undefined,
     contents: [{ role: "user", parts: [{ text: opts.user }] }],
@@ -138,6 +187,7 @@ export async function generate(opts: GeminiCall): Promise<GeminiResult> {
   // of quota is a capacity problem. Both are better answered by the next model
   // than by handing the user an error after a five-pass pipeline.
   if (response.error && SHOULD_FALL_THROUGH.test(response.error.message ?? "")) {
+    why = reasonFor(response.error);
     for (const fallback of GEMINI_MODELS) {
       if (fallback === model) continue;
       model = fallback;
@@ -148,12 +198,17 @@ export async function generate(opts: GeminiCall): Promise<GeminiResult> {
 
   if (response.error) throw new Error(response.error.message ?? "Gemini returned an error");
 
+  // Remember the swap so a caller can say so out loud. Only the first reason
+  // matters: it is the model that was asked for that failed.
+  if (model !== asked) lastSubstitution = { asked, answered: model, reason: why ?? "refused the request" };
+
   const candidate = response.candidates?.[0];
   const text = (candidate?.content?.parts ?? []).map((part) => part.text ?? "").join("").trim();
 
   return {
     text,
     model,
+    ...(model !== asked ? { substitution: { asked, answered: model, reason: why ?? "refused the request" } } : {}),
     inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
     outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
     truncated: candidate?.finishReason === "MAX_TOKENS",
@@ -213,7 +268,14 @@ async function post(model: string, key: string, body: unknown): Promise<GeminiRe
 export async function generateStructured<T>(
   schema: z.ZodType<T>,
   opts: Omit<GeminiCall, "schema">
-): Promise<{ data: T; model: string; inputTokens: number; outputTokens: number; truncated: boolean }> {
+): Promise<{
+  data: T;
+  model: string;
+  substitution?: { asked: string; answered: string; reason: string };
+  inputTokens: number;
+  outputTokens: number;
+  truncated: boolean;
+}> {
   const result = await generate({ ...opts, schema });
   const parsed = schema.safeParse(jsonOf(result.text));
   if (!parsed.success) {
@@ -222,6 +284,7 @@ export async function generateStructured<T>(
   return {
     data: parsed.data,
     model: result.model,
+    ...(result.substitution ? { substitution: result.substitution } : {}),
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
     truncated: result.truncated,
