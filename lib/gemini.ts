@@ -68,6 +68,9 @@ export type GeminiCall = {
   schema?: z.ZodType;
   /** 0 for the extraction passes, where the same plan should read the same way. */
   temperature?: number;
+  /** Override how hard the model thinks. Gemini only; the composer's hold-to-
+   *  think sends this, so "Think deeply" actually buys more reasoning. */
+  thinkingLevel?: string | null;
 };
 
 export type GeminiResult = {
@@ -91,7 +94,7 @@ export async function generate(opts: GeminiCall): Promise<GeminiResult> {
     generationConfig: {
       maxOutputTokens: opts.maxTokens ?? 4096,
       temperature: opts.temperature ?? 0.4,
-      ...(thinking() ? { thinkingConfig: { thinkingLevel: thinking() } } : {}),
+      ...(level(opts) ? { thinkingConfig: { thinkingLevel: level(opts) } } : {}),
       ...(opts.schema
         ? {
             responseMimeType: "application/json",
@@ -168,6 +171,13 @@ function sleep(ms: number): Promise<void> {
 
 function thinking(): string | null {
   return geminiThinking() || null;
+}
+
+/** The caller's level wins over the env default; an empty string turns thinking
+ *  off entirely, for the cheap passes. */
+function level(opts: GeminiCall): string | null {
+  if (opts.thinkingLevel !== undefined) return opts.thinkingLevel || null;
+  return thinking();
 }
 
 function withoutThinking(body: Record<string, unknown>): Record<string, unknown> {

@@ -157,7 +157,11 @@ export default function Home() {
 
   // ---- analyse a plan: the pipeline, streamed into a report turn ----
   const analyze = useCallback(
-    async (text: string, keep: boolean, options?: { planId?: string; quiet?: boolean }) => {
+    async (
+      text: string,
+      keep: boolean,
+      options?: { planId?: string; quiet?: boolean; effort?: string }
+    ) => {
       if (!current) return;
       setBusy(true);
       // A re-run is the same plan again, so it does not repeat the plan text in
@@ -170,7 +174,7 @@ export default function Home() {
         const response = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, persist: keep }),
+          body: JSON.stringify({ text, persist: keep, ...(options?.effort ? { effort: options.effort } : {}) }),
         });
 
         if (!response.ok || !response.body) {
@@ -589,7 +593,7 @@ export default function Home() {
 
   const composer = (
     <Composer
-      onAnalyze={analyze}
+      onAnalyze={(text, keep, effort) => void analyze(text, keep, { effort })}
       onAsk={ask}
       busy={busy}
       aiMode={mode}
@@ -683,6 +687,8 @@ export default function Home() {
             currentId={currentId}
             proposal={proposal}
             tidyBusy={tidyBusy}
+            stage={busy ? stage ?? null : null}
+            mode={mode}
             onTidy={() => void tidy()}
             onApprove={approveDeletion}
             onReject={(verdict) =>
