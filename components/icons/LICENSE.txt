@@ -1,0 +1,6 @@
+Brand marks in this directory are taken from Simple Icons
+(https://github.com/simple-icons/simple-icons), released under CC0 1.0 Universal
+(public domain dedication): https://creativecommons.org/publicdomain/zero/1.0/
+
+The marks themselves are trademarks of their respective owners and are used here
+only to identify the services this app connects to. No endorsement is implied.
