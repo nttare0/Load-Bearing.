@@ -3,16 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PanelLeft } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
-import { ResourceTree } from "@/components/ResourceTree";
+
 import { ProposalBar } from "@/components/ProposalBar";
-import { applyOne, plan, resourceFromAnalysis, type Verdict } from "@/lib/resources";
+import { applyOne, resourceFromAnalysis, type Verdict } from "@/lib/resources";
 import { SidePanel, PanelCard, PanelRow } from "@/components/SidePanel";
 import { toast } from "sonner";
 import { Composer } from "@/components/Composer";
 import { assignKeys } from "@/lib/diff";
 import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
-import { WorkspacePanel } from "@/components/WorkspacePanel";
+import { Sidebar } from "@/components/Sidebar";
 import { BeamToggle } from "@/components/BeamToggle";
 import { bandLabel } from "@/lib/score";
 import type { Analysis } from "@/lib/schema";
@@ -47,6 +47,7 @@ function reportsOf(workspace: Workspace, analyses: Record<string, Analysis>): An
 }
 const LS_PANEL = "load-bearing:panel-open";
 const LS_RAIL = "load-bearing:rail-open";
+const LS_SIDEBAR = "load-bearing:sidebar-collapsed";
 
 /**
  * The application shell: workspaces on the left, one thread in the middle.
@@ -70,6 +71,7 @@ export default function Home() {
   const [mode, setMode] = useState<"demo" | "live" | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [railOpen, setRailOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
   const [proposal, setProposal] = useState<{ verdicts: Verdict[]; note?: string } | null>(null);
   const [tidyBusy, setTidyBusy] = useState(false);
@@ -82,6 +84,7 @@ export default function Home() {
       if (stored) setAnalyses(JSON.parse(stored) as Record<string, Analysis>);
       setPanelOpen(localStorage.getItem(LS_PANEL) === "1");
       setRailOpen(localStorage.getItem(LS_RAIL) !== "0");
+      setSidebarCollapsed(localStorage.getItem(LS_SIDEBAR) === "1");
       setPlans(readPlans());
     } catch {
       // A corrupt cache is not worth a dialog.
@@ -600,19 +603,46 @@ export default function Home() {
   );
 
   return (
-    <div className="relative flex min-h-dvh flex-col">
-      <WorkspacePanel
-        open={panelOpen}
-        onClose={() => setPanelOpen(false)}
-        workspaces={workspaces}
+    <div className="relative flex min-h-dvh">
+      {/* The sidebar is the left column now, as on the reference: moving between
+          pieces of work is what you do most, so it stays visible. */}
+      <Sidebar
+        workspaces={workspaces.map((w) => ({ workspace: w, reports: reportsOf(w, analyses).length }))}
         currentId={currentId}
-        analyses={analyses}
         onSelect={select}
         onCreate={create}
         onDelete={remove}
+        onNewChat={() => {
+          const workspace = createWorkspace();
+          persist([...workspaces, workspace]);
+          select(workspace.id);
+        }}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => {
+          setSidebarCollapsed((prev) => {
+            try {
+              localStorage.setItem(LS_SIDEBAR, prev ? "0" : "1");
+            } catch {
+              // Not worth reporting.
+            }
+            return !prev;
+          });
+        }}
+        onNewFolder={(workspaceId, name) =>
+          update(workspaceId, (w) => applyOne({ action: "create_folder", name }, w))
+        }
+        onOpenResource={(workspaceId, analysisId) => {
+          if (workspaceId !== currentId) select(workspaceId);
+          requestAnimationFrame(() => {
+            document.getElementById(`claim-${analysisId}`)?.scrollIntoView({ behavior: "smooth" });
+          });
+        }}
+        onFileChanged={(workspaceId, resourceId, folderId) =>
+          update(workspaceId, (w) => applyOne({ action: "move", resourceId, folderId }, w))
+        }
       />
 
-      <div className="flex flex-1">
+      <div className="flex min-w-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
           {threaded ? (
             <TopBar
@@ -623,8 +653,6 @@ export default function Home() {
                 reports: reportsOf(w, analyses).length,
               }))}
               currentId={currentId}
-              panelOpen={panelOpen}
-              onTogglePanel={togglePanel}
               railOpen={railOpen}
               railAvailable={railAvailable}
               onToggleRail={toggleRail}
@@ -636,17 +664,10 @@ export default function Home() {
           ) : (
             /* A new workspace keeps the bare canvas: one control in the corner,
                the question, the box. Nothing else has happened yet. */
-            <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between px-[0.75rem] py-[0.625rem]">
-              <button
-                type="button"
-                onClick={togglePanel}
-                aria-label={panelOpen ? "Close workspaces" : "Open workspaces"}
-                aria-expanded={panelOpen}
-                className="pointer-events-auto rounded-[var(--to-radius-sm)] p-[0.3125rem] text-ink-3 hover:bg-[var(--to-surface-2)] hover:text-foreground"
-              >
-                <PanelLeft className="size-4" />
-              </button>
-              <BeamToggle />
+            <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between px-[0.75rem] py-[0.625rem] md:pl-[16.5rem]">
+              <span className="pointer-events-auto">
+                <BeamToggle />
+              </span>
             </div>
           )}
 
@@ -737,22 +758,23 @@ export default function Home() {
               </PanelCard>
             )}
 
-            <PanelCard title="Folders" defaultOpen flush>
-              <div className="px-[0.625rem]">
-                <ResourceTree
-                  workspace={current!}
-                  onOpen={(analysisId) => {
-                    const el = document.getElementById(`claim-${latest.claims[0]?.ref ?? ""}`);
-                    if (el) el.scrollIntoView({ behavior: "smooth" });
-                    void analysisId;
-                  }}
-                  onNewFolder={addFolder}
-                  onMove={moveResource}
-                  onDelete={deleteResource}
-                  onTidy={() => void tidy()}
-                  tidyBusy={tidyBusy}
-                />
-              </div>
+            <PanelCard
+              title="Files"
+              defaultOpen
+              action={
+                <button
+                  type="button"
+                  onClick={() => void tidy()}
+                  disabled={tidyBusy}
+                  className="rounded-[var(--to-radius-sm)] px-[0.1875rem] text-[0.6875rem] text-ink-3 hover:text-foreground disabled:opacity-40"
+                >
+                  {tidyBusy ? "tidying…" : "tidy"}
+                </button>
+              }
+            >
+              <p className="text-[0.75rem] leading-[1.5] text-ink-3">
+                Folders and files live in the sidebar, on the left.
+              </p>
             </PanelCard>
 
             {proposal && (

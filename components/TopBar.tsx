@@ -1,6 +1,6 @@
 "use client";
 
-import { PanelLeft, PanelsTopLeft } from "lucide-react";
+import { PanelsTopLeft } from "lucide-react";
 import { ThreadTitle } from "@/components/ThreadTitle";
 import { Button } from "@/components/ui/button";
 
@@ -16,8 +16,6 @@ export function TopBar({
   name,
   workspaces,
   currentId,
-  panelOpen,
-  onTogglePanel,
   railOpen,
   railAvailable,
   onToggleRail,
@@ -29,8 +27,6 @@ export function TopBar({
   name: string;
   workspaces: { id: string; name: string; reports: number }[];
   currentId: string | null;
-  panelOpen: boolean;
-  onTogglePanel: () => void;
   railOpen: boolean;
   railAvailable: boolean;
   onToggleRail: () => void;
@@ -41,17 +37,6 @@ export function TopBar({
 }) {
   return (
     <div className="sticky top-0 z-20 flex h-[2.75rem] items-center gap-[0.25rem] border-b border-[var(--to-border)] bg-[var(--to-bg)]/85 px-[0.5rem] backdrop-blur-sm">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-7 shrink-0 text-ink-3 hover:text-foreground"
-        onClick={onTogglePanel}
-        aria-label={panelOpen ? "Close workspaces" : "Open workspaces"}
-        aria-expanded={panelOpen}
-      >
-        <PanelLeft className="size-4" />
-      </Button>
-
       <ThreadTitle
         name={name}
         workspaces={workspaces}
