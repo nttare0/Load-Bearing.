@@ -101,6 +101,31 @@ export async function GET(
     });
   }
 
+  if (route === "list") {
+    // Ground truth: what does this key actually list? The fallback chain means
+    // a model this key cannot see still produces a working answer, so "it works"
+    // and "it works on the model we asked for" are different facts.
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) return answer({ ok: false, reason: "no GEMINI_API_KEY" });
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {
+      headers: { "x-goog-api-key": key },
+      signal: AbortSignal.timeout(30_000),
+    });
+    const payload = (await res.json().catch(() => ({}))) as {
+      models?: { name?: string; supportedActions?: string[] }[];
+      error?: { message?: string };
+    };
+    return answer({
+      ok: res.ok,
+      status: res.status,
+      error: payload.error?.message ?? null,
+      models: (payload.models ?? [])
+        .filter((m) => (m.supportedActions ?? []).includes("generateContent"))
+        .map((m) => (m.name ?? "").replace(/^models\//, ""))
+        .filter((name) => name.includes("flash") || name.includes("pro")),
+    });
+  }
+
   if (route === "models") {
     // Ask each candidate model one trivial question and report what it says.
     // The fallback chain hides a missing model behind a working answer, so the
