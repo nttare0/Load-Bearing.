@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronRight, ExternalLink, Eye, EyeOff, Loader2, Trash2, X } from "lucide-react";
+import { Brain, Check, ChevronRight, ExternalLink, Eye, EyeOff, Loader2, Trash2, X } from "lucide-react";
 import { ConnectorList, useConnectors } from "@/components/Connectors";
+import { EFFORTS, THINKING, type Effort } from "@/lib/effort";
 import {
   BYOK_STORAGE,
   EMPTY_SETTINGS,
@@ -43,6 +44,8 @@ export function SettingsPanel({
   mode,
   model,
   storage,
+  thinking,
+  onThinking,
   onClose,
 }: {
   settings: LlmSettings;
@@ -50,6 +53,9 @@ export function SettingsPanel({
   mode: "demo" | "live" | null;
   model: string | null;
   storage: string | null;
+  /** How hard the model is asked to think on the next run. */
+  thinking: Effort;
+  onThinking: (effort: Effort) => void;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(settings);
@@ -146,6 +152,54 @@ export function SettingsPanel({
       </div>
 
       <div className="flex flex-col gap-[0.5rem] px-[0.5rem] py-[0.5rem]">
+        {/* ---- how hard it thinks ---------------------------------------- */}
+        <section className={CARD}>
+          <div className={HEAD_ROW}>
+            <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-ink-2">Thinking</span>
+            <span className="flex shrink-0 items-center gap-[0.1875rem] text-[0.625rem] text-ink-3">
+              <Brain aria-hidden className="size-3" />
+              {THINKING[thinking].hint}
+            </span>
+          </div>
+
+          <div
+            role="radiogroup"
+            aria-label="How hard the model thinks"
+            className="flex gap-[0.25rem] border-t border-[var(--to-border)] p-[0.25rem]"
+          >
+            {EFFORTS.map((effort) => {
+              const spec = THINKING[effort];
+              const active = effort === thinking;
+              return (
+                <button
+                  key={effort}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => onThinking(effort)}
+                  title={spec.detail}
+                  className={`flex flex-1 flex-col items-center gap-[0.0625rem] rounded-[0.375rem] border px-[0.25rem] py-[0.25rem] transition-colors ${
+                    active
+                      ? "border-[var(--to-border-strong)] bg-[var(--to-surface-2)] text-foreground"
+                      : "border-transparent text-ink-3 hover:bg-[var(--to-surface-2)] hover:text-foreground"
+                  }`}
+                >
+                  <span className="text-[0.75rem]">{spec.label}</span>
+                  <span className="text-[0.5625rem] uppercase tracking-[0.04em] text-ink-3">
+                    {spec.cost}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="border-t border-[var(--to-border)] px-[0.625rem] py-[0.375rem] text-[0.6875rem] leading-[1.5] text-ink-3">
+            {mode === "live" && model && !/gemini/i.test(model)
+              ? "Claude does not expose a thinking level here, so this changes the reading, not the reasoning."
+              : `${THINKING[thinking].detail} Holding the send button climbs from here for one run.`}
+          </p>
+        </section>
+
         {/* ---- your model ------------------------------------------------ */}
         <section className={CARD}>
           <div className={HEAD_ROW}>

@@ -89,18 +89,23 @@ export default function Home() {
   /** The simulation skill, as reported by the server. Off unless it says otherwise. */
   const [mirofish, setMirofish] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  const [railOpen, setRailOpen] = useState(true);
   /**
-   * Which panel the spine has open, on which side:
-   *   workspaces → left column
-   *   files      → left column (beside the workspace list)
-   *   settings   → right column
-   * The right column carries files, connectors and settings; the left carries
-   * the chat list. `null` leaves only the spine.
+   * Two panels, independent of each other:
+   *
+   *   left  — the chat list
+   *   right — files and activity, then connectors, with settings over them
+   *
+   * They used to be one `face` value shared by both sides, which meant opening
+   * files closed the chat list and vice versa — a menu pretending to be a
+   * layout. Now each side keeps its own state, and the sidebar shows both.
    */
-  const [face, setFace] = useState<"workspaces" | "files" | "settings" | null>("workspaces");
-  /** How hard the model is asked to think, from the spine or the connector card. */
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
+  /** Which content the right column shows when settings is asked for. */
+  const [face, setFace] = useState<"connectors" | "settings">("connectors");
   const [thinking, setThinking] = useState<Effort>(DEFAULT_EFFORT);
+  /** The top bar's idea of "the panel", which is the right column. */
+  const railOpen = rightOpen;
   /** The visitor's own model key, if they brought one. */
   const [llm, setLlm] = useState<LlmSettings>(EMPTY_SETTINGS);
 
@@ -117,7 +122,9 @@ export default function Home() {
       const stored = localStorage.getItem(LS_ANALYSES);
       if (stored) setAnalyses(JSON.parse(stored) as Record<string, Analysis>);
       setPanelOpen(localStorage.getItem(LS_PANEL) === "1");
-      setRailOpen(localStorage.getItem(LS_RAIL) !== "0");
+      const cameBack = localStorage.getItem(LS_RAIL) !== "0";
+      setLeftOpen(cameBack);
+      setRightOpen(cameBack);
       setLlm(readSettings());
       const savedThinking = localStorage.getItem(LS_THINKING);
       if (savedThinking === "quick" || savedThinking === "think" || savedThinking === "deep") {
@@ -521,9 +528,10 @@ export default function Home() {
     writeCurrentId(workspace.id);
     setDraftPlan("");
     setProposal(null);
-    // A new chat is a new thread, so the right column goes back to files: the
-    // question "what is in this one" is the one a person has next.
-    setFace("files");
+    // A new chat is a new thread: show where it lands, and make sure the
+    // column that holds its files is not folded away.
+    setFace("connectors");
+    setRightOpen(true);
   }, [persist, workspaces]);
 
   const remove = useCallback(
@@ -651,8 +659,21 @@ export default function Home() {
     }
   }, []);
 
+  /** Fold both panels, or bring both back. */
+  const collapseAll = useCallback(() => {
+    const next = !(leftOpen || rightOpen);
+    setLeftOpen(next);
+    setRightOpen(next);
+    try {
+      localStorage.setItem(LS_RAIL, next ? "1" : "0");
+    } catch {
+      // Not worth reporting.
+    }
+  }, [leftOpen, rightOpen]);
+
+  /** Kept for the top bar's own toggle: it folds the right column specifically. */
   const toggleRail = useCallback(() => {
-    setRailOpen((prev) => {
+    setRightOpen((prev) => {
       try {
         localStorage.setItem(LS_RAIL, prev ? "0" : "1");
       } catch {
@@ -699,53 +720,41 @@ export default function Home() {
     />
   );
 
-  const panelOf = (id: "workspaces" | "files" | "settings") => face === id && railOpen;
-
   return (
     <div className="relative flex min-h-dvh">
-      {/* ---- the spine, on the left edge -------------------------------- */}
+      {/* ---- the sidebar, on the left edge -------------------------------- */}
       <NavRail
-        active={face && railOpen ? face : null}
-        workspaces={workspaces.length}
-        thinking={thinking}
-        onThinking={chooseThinking}
+        workspacesOpen={leftOpen}
+        filesOpen={rightOpen}
+        settingsOpen={face === "settings"}
         onNewChat={create}
         onWorkspaces={() => {
-          setFace(face === "workspaces" ? null : "workspaces");
-          setRailOpen(true);
+          setLeftOpen((prev) => !prev);
+          setFace("connectors");
         }}
         onFiles={() => {
-          setFace(face === "files" ? null : "files");
-          setRailOpen(true);
+          setRightOpen((prev) => !prev);
+          setFace(face === "settings" ? "connectors" : face);
         }}
         onSettings={() => {
-          setFace(face === "settings" ? null : "settings");
-          setRailOpen(true);
+          setRightOpen(true);
+          setFace(face === "settings" ? "connectors" : "settings");
         }}
-        onTogglePanel={() => {
-          if (!face) {
-            setFace("workspaces");
-            setRailOpen(true);
-            return;
-          }
-          toggleRail();
-        }}
+        onCollapse={collapseAll}
       />
 
-      {/* ---- left column: chats, then the files of the chat --------------- */}
+      {/* ---- left panel: the chat list ------------------------------------ */}
       <div
         className={`hidden shrink-0 overflow-hidden border-r transition-[width,opacity,border-color] duration-200 ease-out md:flex ${
-          face === "workspaces" || face === "files"
-            ? "border-[var(--to-border)] opacity-100"
-            : "pointer-events-none border-transparent opacity-0"
-        } ${
-          railOpen && (face === "workspaces" || face === "files") ? "w-[15rem]" : "w-0"
+          leftOpen
+            ? "w-[15rem] border-[var(--to-border)] opacity-100"
+            : "pointer-events-none w-0 border-transparent opacity-0"
         }`}
       >
         <aside
-          aria-label="Chats and files"
-          aria-hidden={!railOpen || (face !== "workspaces" && face !== "files")}
-          className="flex w-[15rem] shrink-0 flex-col gap-[0.5rem] px-[0.5rem] py-[0.5rem]"
+          aria-label="Chats"
+          aria-hidden={!leftOpen}
+          className="flex w-[15rem] shrink-0 flex-col px-[0.5rem] py-[0.5rem]"
         >
           <WorkspaceRail
             workspaces={workspaces.map((w) => ({
@@ -758,33 +767,6 @@ export default function Home() {
             onCreate={create}
             onDelete={remove}
           />
-
-          {/* Files belong to the chat above them, so they open underneath it
-              rather than replacing it. */}
-          {panelOf("files") && (
-            <section className="flex min-h-0 max-h-[52%] flex-col rounded-[0.5rem] border border-[var(--to-border)] px-[0.5rem] py-[0.375rem]">
-              <FileRail
-                workspace={current}
-                proposal={proposal}
-                tidyBusy={tidyBusy}
-                stage={busy ? stage ?? null : null}
-                mode={mode}
-                onTidy={() => void tidy()}
-                onApprove={approveDeletion}
-                onReject={(verdict) =>
-                  setProposal((prev) =>
-                    prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
-                  )
-                }
-                onDismissProposal={() => setProposal(null)}
-                onNewFolder={addFolder}
-                onOpenResource={(analysisId) =>
-                  document.getElementById(`claim-${analysisId}`)?.scrollIntoView({ behavior: "smooth" })
-                }
-                onFileChanged={moveResource}
-              />
-            </section>
-          )}
         </aside>
       </div>
 
@@ -849,42 +831,47 @@ export default function Home() {
         </main>
       </div>
 
-      {/* ---- right column: connectors, and settings over them ------------- */}
+      {/* ---- right panel: files and activity, then connectors -------------- */}
       <div
         className={`relative hidden shrink-0 overflow-hidden border-l transition-[width,opacity,border-color] duration-200 ease-out md:flex ${
-          face === "settings" || railOpen
-            ? "border-[var(--to-border)] opacity-100"
-            : "pointer-events-none border-transparent opacity-0"
-        } ${railOpen ? "w-[15rem]" : "w-0"}`}
+          rightOpen
+            ? "w-[15rem] border-[var(--to-border)] opacity-100"
+            : "pointer-events-none w-0 border-transparent opacity-0"
+        }`}
       >
         <aside
-          aria-label={face === "settings" ? "Settings" : "Connectors"}
-          aria-hidden={!railOpen}
+          aria-label={face === "settings" ? "Settings" : "Files, activity and connectors"}
+          aria-hidden={!rightOpen}
           className="relative flex w-[15rem] shrink-0 flex-col gap-[0.5rem] px-[0.5rem] py-[0.5rem]"
         >
+          <FileRail
+            workspace={current}
+            proposal={proposal}
+            tidyBusy={tidyBusy}
+            stage={busy ? stage ?? null : null}
+            mode={mode}
+            onTidy={() => void tidy()}
+            onApprove={approveDeletion}
+            onReject={(verdict) =>
+              setProposal((prev) =>
+                prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
+              )
+            }
+            onDismissProposal={() => setProposal(null)}
+            onNewFolder={addFolder}
+            onOpenResource={(analysisId) =>
+              document.getElementById(`claim-${analysisId}`)?.scrollIntoView({ behavior: "smooth" })
+            }
+            onFileChanged={moveResource}
+          />
+
           <ConnectorRail
             mode={mode}
             model={tools.model}
             storage={tools.storage}
-            thinking={thinking}
-            onThinking={chooseThinking}
             llmKey={Boolean(llm.key.trim())}
-            onOpenSettings={() => {
-              setFace("settings");
-              setRailOpen(true);
-            }}
+            onOpenSettings={() => setFace("settings")}
           />
-
-          {face === "settings" && (
-            <SettingsPanel
-              settings={llm}
-              onChange={saveLlm}
-              mode={mode}
-              model={tools.model}
-              storage={tools.storage}
-              onClose={() => setFace("files")}
-            />
-          )}
 
           {/* Rare UI's licence asks for a visible credit wherever its components
               ship. This is it. */}
@@ -899,6 +886,22 @@ export default function Home() {
               Rare UI
             </a>
           </p>
+
+          {/* Settings is a sheet over this column, not a third panel: it is a
+              place you visit and leave, and its controls refer to everything
+              behind it. */}
+          {face === "settings" && (
+            <SettingsPanel
+              settings={llm}
+              onChange={saveLlm}
+              mode={mode}
+              model={tools.model}
+              storage={tools.storage}
+              thinking={thinking}
+              onThinking={chooseThinking}
+              onClose={() => setFace("connectors")}
+            />
+          )}
         </aside>
       </div>
     </div>
