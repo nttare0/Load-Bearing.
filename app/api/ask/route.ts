@@ -1,5 +1,6 @@
 import { hasApiKey, prose } from "@/lib/ai";
 import { credentialFrom, withVisitor } from "@/lib/visitor";
+import { thinkingFor } from "@/lib/effort";
 import type { Analysis } from "@/lib/schema";
 
 export const runtime = "nodejs";
@@ -19,6 +20,8 @@ type Turn = { role: "user" | "assistant"; content: string };
 
 type Body = {
   question?: string;
+  /** quick | think | deep — the composer's chosen level. */
+  effort?: string;
   history?: Turn[];
   context?: {
     title?: string;
@@ -117,6 +120,7 @@ ${context.notes?.length ? `\nPipeline notes:\n${context.notes.map((n) => `- ${n}
     const { text } = await withVisitor(credential, () => prose({
       system: SYSTEM,
       maxTokens: 1024,
+      thinkingLevel: thinkingFor(body.effort),
       turns: [
         { role: "user", content: `Here is the workspace.\n\n${workspace}` },
         { role: "assistant", content: "Understood. I will answer only from this workspace." },

@@ -25,3 +25,31 @@ export function thinkingFor(effort: unknown): "low" | "medium" | "high" | undefi
   if (effort === "think") return "medium";
   return "low";
 }
+
+/**
+ * The three levels said in the two ways a person needs them: what it is called,
+ * and what it costs. "Think deeply" on its own is a mood; "high · slower" is a
+ * trade. Both are shown together wherever the level is picked.
+ */
+export const THINKING: Record<Effort, { label: string; hint: string; cost: string; detail: string }> = {
+  quick: {
+    label: "Quick",
+    hint: "low",
+    cost: "fastest",
+    detail: "Low thinking. Cheapest and quickest — best when the plan is short and plain.",
+  },
+  think: {
+    label: "Think",
+    hint: "medium",
+    cost: "balanced",
+    detail: "Medium thinking. Slower, and picks up more of what the plan does not say.",
+  },
+  deep: {
+    label: "Deep",
+    hint: "high",
+    cost: "slower",
+    detail: "High thinking. Slowest and most expensive — for plans where being wrong is expensive.",
+  },
+};
+
+export const DEFAULT_EFFORT: Effort = "quick";

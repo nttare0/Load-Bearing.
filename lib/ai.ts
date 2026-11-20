@@ -213,6 +213,8 @@ export async function prose(opts: {
   system: string;
   turns: { role: "user" | "assistant"; content: string }[];
   maxTokens?: number;
+  /** low | medium | high — the spine's thinking level, when the caller has one. */
+  thinkingLevel?: string | null;
 }): Promise<{ text: string; model: string }> {
   if (provider() === "gemini") {
     // Gemini has no separate assistant turns here: the transcript is folded into
@@ -225,6 +227,7 @@ export async function prose(opts: {
       user: transcript,
       maxTokens: opts.maxTokens ?? 1024,
       temperature: 0.3,
+      thinkingLevel: opts.thinkingLevel,
     });
     return { text: result.text, model: result.model };
   }

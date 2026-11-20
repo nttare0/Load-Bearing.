@@ -83,6 +83,12 @@ export type PromptBoxProps = Omit<React.ComponentProps<'div'>, 'onSubmit' | 'chi
     status?: PromptBoxStatus
     onStop?: () => void
     efforts?: PromptEffort[]
+    /**
+     * The level a plain tap sends at, 0-based. A hold still climbs from the
+     * bottom, so this sets the floor rather than capping the ceiling: the level
+     * chosen elsewhere in the app is what a one-press send uses.
+     */
+    startingLevel?: number
     placeholder?: string | string[]
     hint?: React.ReactNode
     actions?: React.ReactNode
@@ -104,6 +110,7 @@ function PromptBox({
     status = 'idle',
     onStop,
     efforts: effortsProp = DEFAULT_EFFORTS,
+    startingLevel = 0,
     placeholder = 'Ask anything',
     hint = 'Hold to think harder',
     actions,
@@ -325,7 +332,10 @@ function PromptBox({
         if (!press.current) {
             return
         }
-        const effort = efforts[Math.min(levelRef.current, top)]
+        // No charge means a tap, and a tap means "send at the level I chose
+        // elsewhere". A hold means the hold wins, because the person moved it.
+        const levelNow = levelRef.current > 0 ? levelRef.current : startingLevel
+        const effort = efforts[Math.min(Math.max(levelNow, 0), top)]
         settle()
         submit(effort)
     }

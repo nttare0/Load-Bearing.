@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, FileUp, FlaskConical, Loader2, Paperclip, Search, ShieldCheck } from "lucide-react";
+import { Brain, ChevronDown, FileUp, FlaskConical, Loader2, Paperclip, Search, ShieldCheck } from "lucide-react";
 import { PromptBox, type PromptEffort } from "@/components/rare/prompt-box";
 import { Button } from "@/components/ui/button";
+import { THINKING, type Effort } from "@/lib/effort";
 
 /**
  * The composer.
@@ -39,6 +40,8 @@ export function Composer({
   recent,
   stage,
   draft,
+  thinking,
+  onThinking,
 }: {
   onAnalyze: (text: string, keep: boolean, effort?: string) => void;
   onAsk: (question: string) => void;
@@ -52,6 +55,9 @@ export function Composer({
   stage?: string | null;
   /** Text pushed in from outside, e.g. an example chip on the empty state. */
   draft?: string;
+  /** The level a plain tap sends at — the same value the spine shows. */
+  thinking: Effort;
+  onThinking: (effort: Effort) => void;
 }) {
   const [text, setText] = useState("");
   // An example arrives as a new string each time, so the same chip pressed twice
@@ -123,6 +129,7 @@ export function Composer({
           document.getElementById("composer-end")?.scrollIntoView({ behavior: "smooth" });
         }}
         efforts={EFFORTS}
+        startingLevel={Math.max(0, EFFORTS.findIndex((item) => item.id === thinking))}
         placeholder={
           mode === "ask"
             ? ["Ask about this workspace…", "What did the last run get wrong?"]
@@ -215,6 +222,21 @@ export function Composer({
             />
             Keep
           </label>
+          {/* The level, right where it is spent. Tapping cycles it; the spine's
+              dots show the same value, so the two can never disagree. */}
+          <button
+            type="button"
+            onClick={() => {
+              const at = EFFORTS.findIndex((item) => item.id === thinking);
+              onThinking(EFFORTS[(at + 1) % EFFORTS.length].id as Effort);
+            }}
+            aria-label={`Thinking: ${THINKING[thinking].label}. Press to change.`}
+            title={THINKING[thinking].detail}
+            className="flex items-center gap-[0.25rem] rounded-[var(--to-radius-sm)] px-[0.25rem] py-[0.125rem] text-[0.75rem] text-ink-3 hover:bg-[var(--to-surface-2)] hover:text-foreground"
+          >
+            <Brain aria-hidden className="size-3" />
+            {THINKING[thinking].label}
+          </button>
           <span className="lb-mono flex items-center gap-[0.25rem] text-[0.6875rem]">
             <ShieldCheck aria-hidden className="size-3" />
             {aiMode === "live" ? "live" : aiMode === "demo" ? "demo" : "—"}
