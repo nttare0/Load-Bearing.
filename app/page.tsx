@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PanelsTopLeft } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 
-import { applyOne, resourceFromAnalysis, type Verdict } from "@/lib/resources";
+import { resourceFromAnalysis } from "@/lib/resources";
 
 import { toast } from "sonner";
 import { Composer } from "@/components/Composer";
@@ -13,11 +12,8 @@ import type { ReasonStep } from "@/lib/reasoning";
 import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
 import { NavRail } from "@/components/NavRail";
-import { StageCard } from "@/components/rail/FileRail";
 import { Panel } from "@/components/rail/panels";
 import { WorkspaceRail } from "@/components/rail/WorkspaceRail";
-import { FileRail } from "@/components/rail/FileRail";
-import { ConnectorRail } from "@/components/rail/ConnectorRail";
 import { DEFAULT_EFFORT, type Effort } from "@/lib/effort";
 import {
   EMPTY_SETTINGS,
@@ -32,6 +28,9 @@ import type { Analysis } from "@/lib/schema";
 import {
   createWorkspace,
   nameFromPlan,
+  NEW_CHAT_TITLE,
+  newChatTarget,
+  titleOf,
   newId,
   readCurrentId,
   readWorkspaces,
@@ -74,7 +73,7 @@ export default function Home() {
   // Seeded optimistically so the rail always has a workspace in it. The values
   // are replaced from storage in the effect below; ids are stable enough for
   // that to be a no-op when hydration agrees.
-  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => [createWorkspace("First workspace")]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => [createWorkspace()]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -99,13 +98,10 @@ export default function Home() {
    *
    * They used to be one `face` value shared by both sides, which meant opening
    * files closed the chat list and vice versa — a menu pretending to be a
-   * layout. Now each side keeps its own state, and the sidebar shows both.
+   * layout. There is only one panel left, so there is only one state to keep.
    */
   const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
   const [thinking, setThinking] = useState<Effort>(DEFAULT_EFFORT);
-  /** The top bar's idea of "the panel", which is the right column. */
-  const railOpen = rightOpen;
   /** The visitor's own model key, if they brought one. */
   const [llm, setLlm] = useState<LlmSettings>(EMPTY_SETTINGS);
 
@@ -129,8 +125,6 @@ export default function Home() {
    * alongside the state so the message gets the steps that actually arrived.
    */
   const reasoningRef = useRef<ReasonStep[]>([]);
-  const [proposal, setProposal] = useState<{ verdicts: Verdict[]; note?: string } | null>(null);
-  const [tidyBusy, setTidyBusy] = useState(false);
   /** A plan the page puts in the composer — from an example chip. */
   const [draftPlan, setDraftPlan] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -141,9 +135,7 @@ export default function Home() {
       const stored = localStorage.getItem(LS_ANALYSES);
       if (stored) setAnalyses(JSON.parse(stored) as Record<string, Analysis>);
       setPanelOpen(localStorage.getItem(LS_PANEL) === "1");
-      const cameBack = localStorage.getItem(LS_RAIL) !== "0";
-      setLeftOpen(cameBack);
-      setRightOpen(cameBack);
+      setLeftOpen(localStorage.getItem(LS_RAIL) !== "0");
       setLlm(readSettings());
       const savedThinking = localStorage.getItem(LS_THINKING);
       if (savedThinking === "quick" || savedThinking === "think" || savedThinking === "deep") {
@@ -156,7 +148,7 @@ export default function Home() {
 
     let list = readWorkspaces();
     if (list.length === 0) {
-      const first = createWorkspace("First workspace");
+      const first = createWorkspace();
       list = [first];
       writeWorkspaces(list);
       writeCurrentId(first.id);
@@ -353,7 +345,10 @@ export default function Home() {
           saveAnalyses({ ...analyses, [analysis.id]: analysis });
           update(current.id, (w) => ({
             ...w,
-            name: w.name === "First workspace" || w.name === "Untitled workspace" ? nameFromPlan(text) : w.name,
+            // Only an unnamed chat takes the plan's words. A chat somebody
+            // renamed keeps its name — that is the difference between naming and
+            // titling, and the second must not overwrite the first.
+            name: w.name === NEW_CHAT_TITLE ? nameFromPlan(text) : w.name,
             plans: [
               ...w.plans.filter((p) => p.id !== analysis.id),
               { id: analysis.id, text, at: analysis.createdAt, title: analysis.title },
@@ -553,21 +548,37 @@ export default function Home() {
    * for evidence to land on, so two chats about two plans cannot cross.
    */
   const create = useCallback(() => {
-    const workspace = createWorkspace();
+    /*
+     * Pressing New chat twice does not make two chats.
+     *
+     * A blank chat is not a thing you can have two of — there is nothing in
+     * either to tell them apart, and a list of "New chat, New chat, New chat" is
+     * exactly the filing cabinet this interface is getting away from. So if the
+     * chat on screen is still blank, New chat brings you back to it. The moment
+     * anything lands in it, pressing New chat makes a genuinely new one.
+     */
+    const { workspace, reused } = newChatTarget(workspaces);
+    if (reused) {
+      setCurrentId(workspace.id);
+      writeCurrentId(workspace.id);
+      setDraftPlan("");
+      setLeftOpen(true);
+      return;
+    }
+
     persist([...workspaces, workspace]);
     setCurrentId(workspace.id);
     writeCurrentId(workspace.id);
     setDraftPlan("");
-    setProposal(null);
-    // A new chat is a new thread: show where it lands, and make sure the
-    // column that holds its files is not folded away.
-    setRightOpen(true);
+    // A new chat is a new thread, and the list it lands in has to be visible for
+    // that to be legible: showing where it went is the whole feedback.
+    setLeftOpen(true);
   }, [persist, workspaces]);
 
   const remove = useCallback(
     (id: string) => {
       const next = workspaces.filter((w) => w.id !== id);
-      const list = next.length ? next : [createWorkspace("First workspace")];
+      const list = next.length ? next : [createWorkspace()];
       persist(list);
       if (id === currentId) select(list[0].id);
     },
@@ -595,82 +606,11 @@ export default function Home() {
     });
   }, []);
 
-  // ---- the shelf: folders and resources ----
-
-  const addFolder = useCallback(
-    (name: string) => {
-      if (!currentId) return;
-      update(currentId, (w) => applyOne({ action: "create_folder", name }, w));
-    },
-    [currentId, update]
-  );
-
-  const moveResource = useCallback(
-    (resourceId: string, folderId: string | null) => {
-      if (!currentId) return;
-      update(currentId, (w) => applyOne({ action: "move", resourceId, folderId }, w));
-    },
-    [currentId, update]
-  );
-
-  const deleteResource = useCallback(
-    (target: { resourceId?: string; folderId?: string }) => {
-      if (!currentId) return;
-      update(currentId, (w) => applyOne({ action: "delete", ...target }, w));
-    },
-    [currentId, update]
-  );
-
-  /**
-   * Ask the model to tidy. Safe changes are applied straight away; deletions
-   * come back as questions and are applied one at a time, by a person.
-   */
-  const tidy = useCallback(async () => {
-    if (!current) return;
-    setTidyBusy(true);
-    try {
-      const response = await fetch("/api/organize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...modelHeaders },
-        body: JSON.stringify({ workspace: current }),
-      });
-      const data = (await response.json()) as {
-        verdicts?: Verdict[];
-        note?: string;
-        error?: string;
-      };
-      if (!response.ok || !data.verdicts) {
-        toast.error(data.error ?? "Tidying failed. Nothing was changed.");
-        return;
-      }
-
-      // Apply what is safe. Deletions are held back for approval.
-      const safe = data.verdicts.filter((v) => v.applies);
-      if (safe.length > 0) {
-        update(current.id, (w) => {
-          let next = w;
-          for (const verdict of safe) next = applyOne(verdict.action, next);
-          return next;
-        });
-      }
-      setProposal({ verdicts: data.verdicts, note: data.note });
-    } catch {
-      toast.error("Tidying failed. Nothing was changed.");
-    } finally {
-      setTidyBusy(false);
-    }
-  }, [current, update]);
-
-  const approveDeletion = useCallback(
-    (verdict: Verdict) => {
-      if (!currentId) return;
-      update(currentId, (w) => applyOne(verdict.action, w));
-      setProposal((prev) =>
-        prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
-      );
-    },
-    [currentId, update]
-  );
+  // The shelf — folders, filed reports, moving things between them — lived in
+  // the right column's Files card, and the column is gone. The data model stays
+  // (a workspace still carries `folders` and `resources`, and still exports with
+  // them); only the code that drove that card goes, rather than sitting here
+  // unused.
 
   const rename = useCallback(
     (name: string) => {
@@ -689,21 +629,15 @@ export default function Home() {
     }
   }, []);
 
-  /** Fold both panels, or bring both back. */
-  const collapseAll = useCallback(() => {
-    const next = !(leftOpen || rightOpen);
-    setLeftOpen(next);
-    setRightOpen(next);
-    try {
-      localStorage.setItem(LS_RAIL, next ? "1" : "0");
-    } catch {
-      // Not worth reporting.
-    }
-  }, [leftOpen, rightOpen]);
-
-  /** Kept for the top bar's own toggle: it folds the right column specifically. */
-  const toggleRail = useCallback(() => {
-    setRightOpen((prev) => {
+  /**
+   * Show or hide the one panel there is.
+   *
+   * There used to be two, and this function used to mean "fold both". With the
+   * right column gone it means the left one, which is now the only layout
+   * decision on the page: the chat list is either there or it is not.
+   */
+  const toggleChats = useCallback(() => {
+    setLeftOpen((prev) => {
       try {
         localStorage.setItem(LS_RAIL, prev ? "0" : "1");
       } catch {
@@ -727,11 +661,9 @@ export default function Home() {
   // thread renders, so the two can never disagree.
   const latest = current ? reportsOf(current, analyses).at(-1) : undefined;
   const threaded = Boolean(current && current.messages.length > 0);
-  // The rail is the only way to your files and your workspaces, so it is
-  // always available — including in an empty workspace with no report yet.
-  const railAvailable = true;
 
-  const currentTitle = current?.name ?? "Workspace";
+  // What the top bar says: `New chat` while it is one, the chat's name after.
+  const currentTitle = current ? titleOf(current) : NEW_CHAT_TITLE;
 
   const composer = (
     <Composer
@@ -754,21 +686,13 @@ export default function Home() {
     <div className="relative flex min-h-dvh">
       {/* ---- the sidebar, on the left edge -------------------------------- */}
       <NavRail
-        workspacesOpen={leftOpen}
-        filesOpen={rightOpen}
-        settingsOpen={false}
+        chatsOpen={leftOpen}
         onNewChat={create}
-        onWorkspaces={() => {
-          setLeftOpen((prev) => !prev);
-        }}
-        onFiles={() => {
-          setRightOpen((prev) => !prev);
-        }}
+        onChats={toggleChats}
         onSettings={() => {
           // A page, not a panel: the whole point of moving it out of the rail.
           window.location.href = "/settings";
         }}
-        onCollapse={collapseAll}
       />
 
       {/* ---- left panel: the chat list ------------------------------------ */}
@@ -783,6 +707,7 @@ export default function Home() {
           <WorkspaceRail
             workspaces={workspaces.map((w) => ({
               workspace: w,
+              title: titleOf(w),
               reports: reportsOf(w, analyses).length,
               messages: w.messages.length,
             }))}
@@ -805,9 +730,8 @@ export default function Home() {
               reports: reportsOf(w, analyses).length,
             }))}
             currentId={currentId}
-            railOpen={railOpen}
-            railAvailable={railAvailable}
-            onToggleRail={toggleRail}
+            chatsOpen={leftOpen}
+            onToggleChats={toggleChats}
             onRename={rename}
             onSelect={select}
             onDelete={remove}
@@ -816,15 +740,6 @@ export default function Home() {
         ) : (
           /* A new workspace keeps the bare canvas: the question and the box. */
           <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-end gap-[0.375rem] px-[0.75rem] py-[0.625rem]">
-            <button
-              type="button"
-              onClick={toggleRail}
-              aria-label={railOpen ? "Hide the rail" : "Show the rail"}
-              aria-expanded={railOpen}
-              className="pointer-events-auto rounded-[var(--to-radius-sm)] p-[0.3125rem] text-ink-3 hover:bg-[var(--to-surface-2)] hover:text-foreground"
-            >
-              <PanelsTopLeft className="size-4" />
-            </button>
             <span className="pointer-events-auto">
               <BeamToggle />
             </span>
@@ -856,59 +771,20 @@ export default function Home() {
         </main>
       </div>
 
-      {/* ---- right panel: each card its own, no wrapper ------------------- */}
-      <div
-        className={`relative hidden shrink-0 overflow-hidden border-l transition-[width,opacity,border-color] duration-200 ease-out md:flex ${
-          rightOpen
-            ? "w-[15rem] border-[var(--to-border)] opacity-100"
-            : "pointer-events-none w-0 border-transparent opacity-0"
-        }`}
-      >
-        <Panel label="Files, activity and connectors" className="w-[15rem]">
-          {/* What the run is doing, its own card, only while it is doing it. */}
-          {stage && <StageCard stage={stage} mode={mode} />}
-
-          <FileRail
-            workspace={current}
-            proposal={proposal}
-            tidyBusy={tidyBusy}
-            onTidy={() => void tidy()}
-            onApprove={approveDeletion}
-            onReject={(verdict) =>
-              setProposal((prev) =>
-                prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
-              )
-            }
-            onDismissProposal={() => setProposal(null)}
-            onNewFolder={addFolder}
-            onOpenResource={(analysisId) =>
-              document.getElementById(`claim-${analysisId}`)?.scrollIntoView({ behavior: "smooth" })
-            }
-            onFileChanged={moveResource}
-          />
-
-          <ConnectorRail
-            mode={mode}
-            model={tools.model}
-            storage={tools.storage}
-            llmKey={Boolean(llm.key.trim())}
-          />
-
-          {/* Rare UI's licence asks for a visible credit wherever its components
-              ship. This is it. */}
-          <p className="mt-auto shrink-0 px-[0.25rem] text-[0.625rem] leading-[1.4] text-ink-3">
-            Components from{" "}
-            <a
-              href="https://www.rareui.com"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="underline underline-offset-2 hover:text-foreground"
-            >
-              Rare UI
-            </a>
-          </p>
-        </Panel>
-      </div>
+      {/* Rare UI's licence asks for a visible credit wherever its components
+          ship. It lived in the right column; the column is gone, so the credit
+          moves to the one place that is always on screen. */}
+      <p className="pointer-events-none fixed bottom-[0.25rem] right-[0.5rem] z-10 text-[0.625rem] leading-[1.4] text-ink-3">
+        Components from{" "}
+        <a
+          href="https://www.rareui.com"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="pointer-events-auto underline underline-offset-2 hover:text-foreground"
+        >
+          Rare UI
+        </a>
+      </p>
     </div>
   );
 }

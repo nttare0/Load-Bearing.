@@ -65,6 +65,15 @@ export function ThreadWorkspace({
     );
   }
 
+  /**
+   * A workspace with nothing in it **is** a new chat.
+   *
+   * That is the distinction the sidebar draws, and it has to hold here too: New
+   * chat is a verb that opens this canvas, and this canvas stays "new" until
+   * something is sent. The heading says so in the first line — `New chat` above
+   * `What would you like to test?` — rather than leaving a person to work out
+   * whether the blank column is a chat they already made or one they have not.
+   */
   const empty = workspace.messages.length === 0;
 
   if (empty) {
@@ -75,6 +84,10 @@ export function ThreadWorkspace({
     return (
       <div className="flex flex-1 flex-col justify-center gap-[1.5rem] pb-[3rem]">
         <div className="flex flex-col gap-[0.5rem]">
+          {/* The label, not a heading: it marks the state this canvas is in. */}
+          <p className="text-center text-[0.6875rem] uppercase tracking-[0.08em] text-ink-3">
+            New chat · its own workspace
+          </p>
           <h1 className="lb-serif text-center text-[2rem] leading-[1.1] tracking-[-0.01em] text-ink sm:text-[2.5rem]">
             What would you like to test?
           </h1>
@@ -82,6 +95,12 @@ export function ThreadWorkspace({
             Paste a plan — a business, a launch, a hire, a trip. You get back the assumptions it
             quietly rests on, ranked by what breaks if they are wrong, each with the cheapest test
             that could settle it.
+          </p>
+          {/* Where it will go, said before it goes there: the one thing a new
+              chat cannot show you is the list it will join. */}
+          <p className="mx-auto max-w-[34rem] text-center text-[0.75rem] leading-[1.5] text-ink-3">
+            Sending starts this chat and names it after the plan. Until then nothing is saved,
+            and asking for a new chat leaves this one blank.
           </p>
         </div>
 

@@ -32,8 +32,10 @@ two controls that get you unstuck cannot live inside the thing you are stuck
 in. Previously the only way to a new workspace was a `+` inside a card that
 itself folds away.
 
-**Settings** (`components/SettingsPanel.tsx`) is a sheet over the right column,
-in the order the questions actually arrive:
+**Settings** (`app/settings/page.tsx`) is its own page — not a sheet over a
+column — in the order the questions actually arrive. It opens with what the app is
+using right now (model, whose key, thinking level, where work is kept) before
+offering anything to change:
 
 ### 1. Your model
 
