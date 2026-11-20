@@ -9,6 +9,7 @@ import { applyOne, resourceFromAnalysis, type Verdict } from "@/lib/resources";
 import { toast } from "sonner";
 import { Composer } from "@/components/Composer";
 import { assignKeys } from "@/lib/diff";
+import type { ReasonStep } from "@/lib/reasoning";
 import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
 import { NavRail } from "@/components/NavRail";
@@ -109,6 +110,25 @@ export default function Home() {
   const [llm, setLlm] = useState<LlmSettings>(EMPTY_SETTINGS);
 
   const [stage, setStage] = useState<string | null>(null);
+  /**
+   * The steps arriving from the run in progress.
+   *
+   * This is the only place the reasoning exists while it is happening. When the
+   * run finishes the steps move onto the message, so a report reread tomorrow
+   * still has its thinking behind it, and the live copy is cleared so two runs
+   * cannot show each other's steps.
+   */
+  const [reasoning, setReasoning] = useState<ReasonStep[]>([]);
+  /**
+   * The same steps, readable synchronously.
+   *
+   * The run's last act is to append the report message inside a state updater,
+   * and by then `reasoning` in this closure is the value from the render that
+   * started the run — empty. The message would then be saved with no thinking
+   * behind it, which is exactly the thing the panel is for. The ref is written
+   * alongside the state so the message gets the steps that actually arrived.
+   */
+  const reasoningRef = useRef<ReasonStep[]>([]);
   const [proposal, setProposal] = useState<{ verdicts: Verdict[]; note?: string } | null>(null);
   const [tidyBusy, setTidyBusy] = useState(false);
   /** A plan the page puts in the composer — from an example chip. */
@@ -242,6 +262,8 @@ export default function Home() {
       if (!options?.quiet) {
         append({ id: newId(), role: "user", text, at: new Date().toISOString() });
       }
+      reasoningRef.current = [];
+      setReasoning([]);
 
       try {
         const response = await fetch("/api/analyze", {
@@ -281,7 +303,16 @@ export default function Home() {
               const event = JSON.parse(line.slice(6)) as
                 | { type: "done"; analysis: Analysis; passes?: { stage: string; ms: number }[] }
                 | { type: "stage"; stage: string; detail?: string }
+                | { type: "reason"; pass: string; kind: ReasonStep["kind"]; text: string; ms?: number }
                 | { type: "error"; message: string };
+              if (event.type === "reason") {
+                const next = [
+                  ...reasoningRef.current,
+                  { pass: event.pass, kind: event.kind, text: event.text, ms: event.ms },
+                ];
+                reasoningRef.current = next;
+                setReasoning(next);
+              }
               // The running pass goes into the composer strip, so the wait is
               // legible without a separate progress panel.
               if (event.type === "stage") setStage(STAGE_LABEL[event.stage] ?? event.stage);
@@ -340,6 +371,7 @@ export default function Home() {
                 kind: "report",
                 text: analysis.title,
                 analysisId: analysis.id,
+                reasoning: reasoningRef.current,
                 at: new Date().toISOString(),
                 ...(donePasses?.length ? { passes: donePasses } : {}),
               },
@@ -814,6 +846,7 @@ export default function Home() {
             onRerun={rerun}
             busy={busy}
             stage={stage}
+            reasoning={reasoning}
             composer={composer}
             mirofish={mirofish}
             demo={mode === "demo"}

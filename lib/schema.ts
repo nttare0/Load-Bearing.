@@ -179,6 +179,15 @@ export type PassTiming = { stage: string; ms: number };
 /** Shape of the SSE events the pipeline streams to the browser. */
 export type PipelineEvent =
   | { type: "stage"; stage: PipelineStage; detail?: string }
+  /**
+   * A step of the model's thinking, while it happens.
+   *
+   * The five passes already emit `stage` boundaries, but a boundary says only
+   * that something started. These carry the finding: how many claims the plan
+   * states, which ones nobody wrote down, what the audit changed. The reasoning
+   * panel reads this stream and nothing else.
+   */
+  | { type: "reason"; pass: string; kind: "think" | "found" | "check" | "warn"; text: string; ms?: number }
   | { type: "claims"; claims: Claim[]; summary: string; title: string; notes: string[] }
   | { type: "failureModes"; failureModes: FailureMode[] }
   | { type: "evidence"; evidence: EvidenceItem[]; notes: string[] }

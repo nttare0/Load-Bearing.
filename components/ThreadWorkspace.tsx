@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { Thread } from "@/components/Thread";
+import { ReasoningPanel } from "@/components/ReasoningPanel";
+import type { ReasonStep } from "@/lib/reasoning";
 import { StatusLegend } from "@/components/Report";
 import { EXAMPLES } from "@/lib/examples";
 import type { Analysis } from "@/lib/schema";
@@ -29,6 +31,7 @@ export function ThreadWorkspace({
   onRerun,
   busy,
   stage,
+  reasoning,
   composer,
   mirofish,
   demo,
@@ -44,6 +47,8 @@ export function ThreadWorkspace({
   busy: boolean;
   /** The pass currently running, already in plain language. */
   stage?: string | null;
+  /** The thinking steps of the run in progress, streamed. */
+  reasoning?: ReasonStep[];
   composer: ReactNode;
   mirofish?: boolean;
   /** No model configured: what comes back is a worked example, not your plan. */
@@ -63,6 +68,10 @@ export function ThreadWorkspace({
   const empty = workspace.messages.length === 0;
 
   if (empty) {
+    // A first run has no thread to hang the panel on, so it appears above the
+    // composer instead — the same place, the same shape.
+    const firstRun = busy ? <ReasoningPanel steps={reasoning ?? []} running /> : null;
+
     return (
       <div className="flex flex-1 flex-col justify-center gap-[1.5rem] pb-[3rem]">
         <div className="flex flex-col gap-[0.5rem]">
@@ -79,6 +88,8 @@ export function ThreadWorkspace({
         {/* No key: say so where it cannot be missed, and say exactly what that
             means — the report you get is a worked example, not your plan. */}
         {demo && <DemoNotice className="mx-auto max-w-[42rem]" />}
+
+        {firstRun && <div className="mx-auto w-full max-w-[42rem]">{firstRun}</div>}
 
         <div className="mx-auto w-full max-w-[42rem]">{composer}</div>
 
@@ -120,12 +131,15 @@ export function ThreadWorkspace({
         busy={busy}
       />
       {busy && (
-        /* During a run the thread says which pass is running, so the wait has
-           a shape. The composer below is disabled and carries the same text. */
-        <p className="flex items-center gap-[0.375rem] text-[0.8125rem] text-ink-3" role="status">
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          {stage ?? "starting"}
-        </p>
+        /* The wait, with its contents: the panel streams what the model is
+           doing and finding, above the composer that is currently disabled. */
+        <div className="flex flex-col gap-[0.375rem]" role="status" aria-live="polite">
+          <ReasoningPanel steps={reasoning ?? []} running />
+          <p className="flex items-center gap-[0.375rem] text-[0.75rem] text-ink-3">
+            <Loader2 className="size-3 animate-spin" aria-hidden />
+            {stage ?? "starting"}
+          </p>
+        </div>
       )}
       {/* Pinned to the bottom of the column. It used to sit after the whole
           report, four screens down, so answering anything meant scrolling to
