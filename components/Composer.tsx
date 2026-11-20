@@ -184,8 +184,10 @@ export function Composer({
           attaches its repo and branch: state you can read without opening
           anything. Here it names where the work lands and what the run does. */}
       <div className="flex flex-wrap items-center gap-x-[0.5rem] gap-y-[0.25rem] px-[0.25rem] text-[0.75rem] text-ink-3">
+        {/* Where the work lands. `New chat` until it is one, which is the same
+            word the sidebar's action and the canvas heading use. */}
         <span className="flex min-w-0 items-center gap-[0.3125rem]">
-          <span className="lb-mono shrink-0 text-[0.6875rem]">ws</span>
+          <span className="lb-mono shrink-0 text-[0.6875rem]">chat</span>
           <span className="max-w-[11rem] truncate text-ink-2">{workspaceName}</span>
         </span>
 

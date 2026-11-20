@@ -67,11 +67,50 @@ export function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function createWorkspace(name = "Untitled workspace"): Workspace {
+/**
+ * A workspace with nothing in it is a **new chat**, not a workspace with a bad
+ * name.
+ *
+ * This is the distinction the interface now makes, following arena.ai/agent:
+ * "New chat" is a verb that opens a blank thread, and it stays a new chat until
+ * the first thing lands in it. The moment a plan is sent, the title comes from
+ * the plan's own words and the row in the list becomes a chat you can find
+ * again. Naming the empty state "Untitled workspace" put a filing-cabinet label
+ * on something that was really an invitation to type.
+ */
+export const NEW_CHAT_TITLE = "New chat";
+
+/** Whether a workspace is still the blank one a new chat opens. */
+export function isNewChat(workspace: Pick<Workspace, "messages" | "plans">): boolean {
+  return workspace.messages.length === 0 && workspace.plans.length === 0;
+}
+
+/** The row's title: its name, or the truth about it if nobody has named it yet. */
+export function titleOf(workspace: Workspace): string {
+  if (isNewChat(workspace)) return NEW_CHAT_TITLE;
+  return workspace.name;
+}
+
+/**
+ * Where pressing **New chat** should land.
+ *
+ * Either the blank chat that already exists, or a fresh one. Pulled out of the
+ * page so the rule can be tested without a browser: pressing New chat twice must
+ * not make two blanks.
+ */
+export function newChatTarget(
+  workspaces: Workspace[],
+  make: () => Workspace = createWorkspace
+): { workspace: Workspace; reused: boolean } {
+  const blank = workspaces.find(isNewChat);
+  return blank ? { workspace: blank, reused: true } : { workspace: make(), reused: false };
+}
+
+export function createWorkspace(name = NEW_CHAT_TITLE): Workspace {
   const now = new Date().toISOString();
   return {
     id: newId(),
-    name: name.trim() || "Untitled workspace",
+    name: name.trim() || NEW_CHAT_TITLE,
     createdAt: now,
     updatedAt: now,
     messages: [],
@@ -81,11 +120,44 @@ export function createWorkspace(name = "Untitled workspace"): Workspace {
   };
 }
 
-/** The title a workspace takes from its first plan, so the rail is never all "Untitled". */
+/**
+ * The title a chat takes from its first plan.
+ *
+ * Two things were wrong with the old version, and both produced the same bad
+ * title:
+ *
+ *   - a first line of one or two words ("Meals.") passed the length check and
+ *     became the title, so a real plan about a real kitchen was filed as "Meals";
+ *   - anything shorter than that fell back to "Untitled workspace", which is the
+ *     filing-cabinet label this interface is trying to stop using.
+ *
+ * A line is only a title if it is at least three words. Otherwise the title comes
+ * from the plan's first clause, which is always there — you cannot send a plan
+ * with nothing in it — and only an empty string is a new chat.
+ */
 export function nameFromPlan(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return NEW_CHAT_TITLE;
+
+  /** Trim a candidate to a readable length, without punctuation at the end. */
+  const tidy = (value: string) =>
+    value.trim().split(" ").slice(0, 7).join(" ").replace(/[.,;:!?]+$/, "").trim();
+
   const firstLine = text.trim().split(/\n/)[0]?.replace(/\s+/g, " ").trim() ?? "";
-  const words = firstLine.split(" ").slice(0, 7).join(" ");
-  return words.length > 3 ? words.replace(/[.,;:]$/, "") : "Untitled workspace";
+  if (firstLine.split(" ").filter(Boolean).length >= 3) {
+    const candidate = tidy(firstLine);
+    if (candidate.length > 3) return candidate;
+  }
+
+  // Short first line: the first *sentence* with enough words to be a title, and
+  // the first clause of that. Skipping the short ones matters — "Meals." is a
+  // label above the plan, not the plan.
+  for (const sentence of clean.split(/(?<=[.!?])\s+/)) {
+    if (sentence.split(" ").filter(Boolean).length < 3) continue;
+    const candidate = tidy(sentence.split(/[,;:]/)[0] ?? sentence);
+    if (candidate.length > 3) return candidate;
+  }
+  return NEW_CHAT_TITLE;
 }
 
 export function readWorkspaces(): Workspace[] {

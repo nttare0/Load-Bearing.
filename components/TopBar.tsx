@@ -16,9 +16,8 @@ export function TopBar({
   name,
   workspaces,
   currentId,
-  railOpen,
-  railAvailable,
-  onToggleRail,
+  chatsOpen,
+  onToggleChats,
   onRename,
   onSelect,
   onDelete,
@@ -27,9 +26,8 @@ export function TopBar({
   name: string;
   workspaces: { id: string; name: string; reports: number }[];
   currentId: string | null;
-  railOpen: boolean;
-  railAvailable: boolean;
-  onToggleRail: () => void;
+  chatsOpen: boolean;
+  onToggleChats: () => void;
   onRename: (name: string) => void;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
@@ -48,18 +46,16 @@ export function TopBar({
       />
 
       <div className="ml-auto flex shrink-0 items-center gap-[0.125rem]">
-        {railAvailable && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7 text-ink-3 hover:text-foreground"
-            onClick={onToggleRail}
-            aria-label={railOpen ? "Hide the rail" : "Show the rail"}
-            aria-expanded={railOpen}
-          >
-            <PanelsTopLeft className="size-4" />
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 text-ink-3 hover:text-foreground"
+          onClick={onToggleChats}
+          aria-label={chatsOpen ? "Hide the chat list" : "Show the chat list"}
+          aria-expanded={chatsOpen}
+        >
+          <PanelsTopLeft className="size-4" />
+        </Button>
       </div>
     </div>
   );

@@ -1,55 +1,48 @@
 "use client";
 
-import { Files, MessagesSquare, PanelLeft, Plus, Settings2 } from "lucide-react";
+import { MessagesSquare, PanelLeft, Plus, Settings2 } from "lucide-react";
 
 /**
- * The left sidebar.
+ * The sidebar.
  *
- * The first version was wrong in a way worth naming: a column of unlabelled
- * icons, one of which was a brain that changed a value rather than going
- * anywhere, with a paragraph of legend underneath explaining the icons. If a
- * menu needs a key, the menu is the problem.
+ * This column used to hold five destinations: New chat, Chats, Files, Settings,
+ * Hide. Two of them — **Files** and the **connectors card** — are gone, because
+ * they pointed at a second panel that no longer exists. What is left is the
+ * layout arena.ai/agent actually uses: one place to start, one place to look
+ * back, one place to configure, and a control for the panel itself.
  *
- * What it does now:
+ * The idea being borrowed from Arena is not its pixels, it is its **distinction**:
  *
- *   - **every item is a place, and every item is named.** Icon over a 9px label,
- *     in a 56px column. Nothing here sets a value; the thinking level lives in
- *     Settings, which is where it can be explained.
- *   - **the two panels are independent.** Workspaces on the left, Files and
- *     Connectors on the right, and either can be closed without the other. The
- *     pressed state tells you which is open, so the sidebar is a status as well
- *     as a menu.
- *   - **new chat is primary**, separated above the destinations by a rule and
- *     by a filled surface.
+ *   - **New chat is not a place, it is an action.** It sits above the rule, has
+ *     its own filled surface, and does not take a pressed state, because you
+ *     cannot be in it. The thread underneath it *is* the new chat until
+ *     something is in it, then it becomes a chat in the list.
+ *   - **Chats is a place.** It has a pressed state, because the panel it opens
+ *     is either showing or not, and the sidebar says which.
+ *
+ * That is the whole difference this file is drawing: one destination, one verb.
  */
 const ITEM =
   "flex w-full flex-col items-center gap-[0.1875rem] rounded-[0.4375rem] px-[0.125rem] py-[0.375rem] text-ink-3 transition-colors hover:bg-[var(--to-surface-2)] hover:text-foreground";
 const ON = "bg-[var(--to-surface-2)] text-foreground shadow-[inset_0_0_0_1px_var(--to-border)]";
 
 export function NavRail({
-  workspacesOpen,
-  filesOpen,
-  settingsOpen,
+  chatsOpen,
   onNewChat,
-  onWorkspaces,
-  onFiles,
+  onChats,
   onSettings,
-  onCollapse,
 }: {
-  workspacesOpen: boolean;
-  filesOpen: boolean;
-  settingsOpen: boolean;
+  chatsOpen: boolean;
   onNewChat: () => void;
-  onWorkspaces: () => void;
-  onFiles: () => void;
+  onChats: () => void;
   onSettings: () => void;
-  onCollapse: () => void;
 }) {
   return (
     <nav
-      aria-label="Chats, files and settings"
+      aria-label="Chats and settings"
       className="hidden w-[3.5rem] shrink-0 flex-col items-center gap-[0.125rem] border-r border-[var(--to-border)] bg-[var(--to-surface)] px-[0.25rem] py-[0.5rem] md:flex"
     >
+      {/* An action, not a destination: no pressed state to be in. */}
       <button
         type="button"
         onClick={onNewChat}
@@ -62,27 +55,19 @@ export function NavRail({
 
       <span aria-hidden className="my-[0.375rem] h-px w-[1.75rem] bg-[var(--to-border)]" />
 
-      <Item label="Chats" on={workspacesOpen} onClick={onWorkspaces} pressed={workspacesOpen}>
+      <Item label="Chats" on={chatsOpen} onClick={onChats} pressed={chatsOpen}>
         <MessagesSquare aria-hidden className="size-[1.125rem]" />
       </Item>
 
-      <Item label="Files" on={filesOpen} onClick={onFiles} pressed={filesOpen}>
-        <Files aria-hidden className="size-[1.125rem]" />
-      </Item>
-
-      <Item label="Settings" on={settingsOpen} onClick={onSettings} pressed={settingsOpen}>
+      <Item label="Settings" on={false} onClick={onSettings} pressed={false}>
         <Settings2 aria-hidden className="size-[1.125rem]" />
       </Item>
 
-      <button
-        type="button"
-        onClick={onCollapse}
-        title="Hide the side panels"
-        className={`${ITEM} mt-auto`}
-      >
+      {/* The panel toggle, at the bottom where a layout control belongs — and
+          pressed when the panel is away, since its job is "bring it back". */}
+      <Item label={chatsOpen ? "Hide chats" : "Show chats"} on={!chatsOpen} onClick={onChats} pressed={!chatsOpen}>
         <PanelLeft aria-hidden className="size-[1.125rem]" />
-        <span className="text-[0.5625rem] leading-none">Hide</span>
-      </button>
+      </Item>
     </nav>
   );
 }
