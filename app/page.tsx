@@ -11,9 +11,12 @@ import { Composer } from "@/components/Composer";
 import { assignKeys } from "@/lib/diff";
 import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
-import { RailCollapseButton, SideRail } from "@/components/SideRail";
 import { NavRail } from "@/components/NavRail";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { WorkspaceRail } from "@/components/rail/WorkspaceRail";
+import { FileRail } from "@/components/rail/FileRail";
+import { ConnectorRail } from "@/components/rail/ConnectorRail";
+import { DEFAULT_EFFORT, type Effort } from "@/lib/effort";
 import {
   EMPTY_SETTINGS,
   llmHeaders,
@@ -55,6 +58,7 @@ function reportsOf(workspace: Workspace, analyses: Record<string, Analysis>): An
 }
 const LS_PANEL = "load-bearing:panel-open";
 const LS_RAIL = "load-bearing:rail-open";
+const LS_THINKING = "load-bearing:thinking";
 
 /**
  * The application shell: workspaces on the left, one thread in the middle.
@@ -86,9 +90,17 @@ export default function Home() {
   const [mirofish, setMirofish] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [railOpen, setRailOpen] = useState(true);
-  // Which face of the right column is showing: the files panel, settings, or
-  // neither (a bare canvas with just the spine).
-  const [face, setFace] = useState<"chat" | "settings" | null>("chat");
+  /**
+   * Which panel the spine has open, on which side:
+   *   workspaces → left column
+   *   files      → left column (beside the workspace list)
+   *   settings   → right column
+   * The right column carries files, connectors and settings; the left carries
+   * the chat list. `null` leaves only the spine.
+   */
+  const [face, setFace] = useState<"workspaces" | "files" | "settings" | null>("workspaces");
+  /** How hard the model is asked to think, from the spine or the connector card. */
+  const [thinking, setThinking] = useState<Effort>(DEFAULT_EFFORT);
   /** The visitor's own model key, if they brought one. */
   const [llm, setLlm] = useState<LlmSettings>(EMPTY_SETTINGS);
 
@@ -107,6 +119,10 @@ export default function Home() {
       setPanelOpen(localStorage.getItem(LS_PANEL) === "1");
       setRailOpen(localStorage.getItem(LS_RAIL) !== "0");
       setLlm(readSettings());
+      const savedThinking = localStorage.getItem(LS_THINKING);
+      if (savedThinking === "quick" || savedThinking === "think" || savedThinking === "deep") {
+        setThinking(savedThinking);
+      }
       setPlans(readPlans());
     } catch {
       // A corrupt cache is not worth a dialog.
@@ -342,7 +358,7 @@ export default function Home() {
 
   // ---- ask about the work: read-only, answered from the workspace ----
   const ask = useCallback(
-    async (question: string) => {
+    async (question: string, effort?: string) => {
       if (!current) return;
       setBusy(true);
       append({ id: newId(), role: "user", text: question, at: new Date().toISOString() });
@@ -357,6 +373,7 @@ export default function Home() {
           headers: { "Content-Type": "application/json", ...modelHeaders },
           body: JSON.stringify({
             question,
+            ...(effort ? { effort } : {}),
             history: current.messages
               .filter((m) => m.kind === "answer" || m.role === "user")
               .slice(-8)
@@ -489,11 +506,25 @@ export default function Home() {
     setPanelOpen(false);
   }, []);
 
+  /**
+   * One chat, one workspace.
+   *
+   * A new chat is not a new view of the same data — it is a new workspace with
+   * its own messages, plans, reports and folders. That is what makes "each chat
+   * has its own workspace" true rather than a label: there is no shared shelf
+   * for evidence to land on, so two chats about two plans cannot cross.
+   */
   const create = useCallback(() => {
     const workspace = createWorkspace();
     persist([...workspaces, workspace]);
-    select(workspace.id);
-  }, [persist, select, workspaces]);
+    setCurrentId(workspace.id);
+    writeCurrentId(workspace.id);
+    setDraftPlan("");
+    setProposal(null);
+    // A new chat is a new thread, so the right column goes back to files: the
+    // question "what is in this one" is the one a person has next.
+    setFace("files");
+  }, [persist, workspaces]);
 
   const remove = useCallback(
     (id: string) => {
@@ -611,6 +642,15 @@ export default function Home() {
     [currentId, update]
   );
 
+  const chooseThinking = useCallback((effort: Effort) => {
+    setThinking(effort);
+    try {
+      localStorage.setItem(LS_THINKING, effort);
+    } catch {
+      // A preference that cannot be saved is still a preference for this tab.
+    }
+  }, []);
+
   const toggleRail = useCallback(() => {
     setRailOpen((prev) => {
       try {
@@ -645,7 +685,7 @@ export default function Home() {
   const composer = (
     <Composer
       onAnalyze={(text, keep, effort) => void analyze(text, keep, { effort })}
-      onAsk={ask}
+      onAsk={(question) => void ask(question, thinking)}
       busy={busy}
       aiMode={mode}
       workspaceName={currentTitle}
@@ -654,11 +694,101 @@ export default function Home() {
       recent={current ? reportsOf(current, analyses).map((a) => ({ id: a.id, title: a.title })) : []}
       stage={stage}
       draft={draftPlan}
+      thinking={thinking}
+      onThinking={chooseThinking}
     />
   );
 
+  const panelOf = (id: "workspaces" | "files" | "settings") => face === id && railOpen;
+
   return (
     <div className="relative flex min-h-dvh">
+      {/* ---- the spine, on the left edge -------------------------------- */}
+      <NavRail
+        active={face && railOpen ? face : null}
+        workspaces={workspaces.length}
+        thinking={thinking}
+        onThinking={chooseThinking}
+        onNewChat={create}
+        onWorkspaces={() => {
+          setFace(face === "workspaces" ? null : "workspaces");
+          setRailOpen(true);
+        }}
+        onFiles={() => {
+          setFace(face === "files" ? null : "files");
+          setRailOpen(true);
+        }}
+        onSettings={() => {
+          setFace(face === "settings" ? null : "settings");
+          setRailOpen(true);
+        }}
+        onTogglePanel={() => {
+          if (!face) {
+            setFace("workspaces");
+            setRailOpen(true);
+            return;
+          }
+          toggleRail();
+        }}
+      />
+
+      {/* ---- left column: chats, then the files of the chat --------------- */}
+      <div
+        className={`hidden shrink-0 overflow-hidden border-r transition-[width,opacity,border-color] duration-200 ease-out md:flex ${
+          face === "workspaces" || face === "files"
+            ? "border-[var(--to-border)] opacity-100"
+            : "pointer-events-none border-transparent opacity-0"
+        } ${
+          railOpen && (face === "workspaces" || face === "files") ? "w-[15rem]" : "w-0"
+        }`}
+      >
+        <aside
+          aria-label="Chats and files"
+          aria-hidden={!railOpen || (face !== "workspaces" && face !== "files")}
+          className="flex w-[15rem] shrink-0 flex-col gap-[0.5rem] px-[0.5rem] py-[0.5rem]"
+        >
+          <WorkspaceRail
+            workspaces={workspaces.map((w) => ({
+              workspace: w,
+              reports: reportsOf(w, analyses).length,
+              messages: w.messages.length,
+            }))}
+            currentId={currentId}
+            onSelect={select}
+            onCreate={create}
+            onDelete={remove}
+          />
+
+          {/* Files belong to the chat above them, so they open underneath it
+              rather than replacing it. */}
+          {panelOf("files") && (
+            <section className="flex min-h-0 max-h-[52%] flex-col rounded-[0.5rem] border border-[var(--to-border)] px-[0.5rem] py-[0.375rem]">
+              <FileRail
+                workspace={current}
+                proposal={proposal}
+                tidyBusy={tidyBusy}
+                stage={busy ? stage ?? null : null}
+                mode={mode}
+                onTidy={() => void tidy()}
+                onApprove={approveDeletion}
+                onReject={(verdict) =>
+                  setProposal((prev) =>
+                    prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
+                  )
+                }
+                onDismissProposal={() => setProposal(null)}
+                onNewFolder={addFolder}
+                onOpenResource={(analysisId) =>
+                  document.getElementById(`claim-${analysisId}`)?.scrollIntoView({ behavior: "smooth" })
+                }
+                onFileChanged={moveResource}
+              />
+            </section>
+          )}
+        </aside>
+      </div>
+
+      {/* ---- the thread --------------------------------------------------- */}
       <div className="flex min-w-0 flex-1 flex-col">
         {threaded ? (
           <TopBar
@@ -719,97 +849,57 @@ export default function Home() {
         </main>
       </div>
 
-      {/* The right column, from the outside in: a spine that is always there,
-          then the panel it opens. The spine sits outside the fold because the
-          two controls that get you unstuck — a new message, and settings —
-          cannot live inside the thing you are trying to get out of. */}
-      <div className="flex shrink-0 items-stretch">
-        <div
-          className={`relative hidden justify-end overflow-hidden border-l transition-[width,opacity,border-color] duration-200 ease-out md:flex ${
-            face && railOpen
-              ? "w-[15rem] border-[var(--to-border)] opacity-100"
-              : "pointer-events-none w-0 border-transparent opacity-0"
-          }`}
+      {/* ---- right column: connectors, and settings over them ------------- */}
+      <div
+        className={`relative hidden shrink-0 overflow-hidden border-l transition-[width,opacity,border-color] duration-200 ease-out md:flex ${
+          face === "settings" || railOpen
+            ? "border-[var(--to-border)] opacity-100"
+            : "pointer-events-none border-transparent opacity-0"
+        } ${railOpen ? "w-[15rem]" : "w-0"}`}
+      >
+        <aside
+          aria-label={face === "settings" ? "Settings" : "Connectors"}
+          aria-hidden={!railOpen}
+          className="relative flex w-[15rem] shrink-0 flex-col gap-[0.5rem] px-[0.5rem] py-[0.5rem]"
         >
-          <aside
-            aria-label={face === "settings" ? "Settings" : "Files, workspaces and connectors"}
-            aria-hidden={!face || !railOpen}
-            className="relative flex w-[15rem] shrink-0 flex-col gap-[0.5rem] px-[0.5rem] pb-[0.5rem] pt-[0.375rem]"
-          >
-            <div className="flex justify-end">
-              <RailCollapseButton onClick={toggleRail} />
-            </div>
-
-            {face === "settings" ? (
-              <SettingsPanel
-                settings={llm}
-                onChange={saveLlm}
-                mode={mode}
-                model={tools.model}
-                storage={tools.storage}
-                onClose={() => setFace("chat")}
-              />
-            ) : (
-              <SideRail
-                workspace={current}
-                workspaces={workspaces.map((w) => ({
-                  workspace: w,
-                  reports: reportsOf(w, analyses).length,
-                }))}
-                currentId={currentId}
-                proposal={proposal}
-                tidyBusy={tidyBusy}
-                stage={busy ? stage ?? null : null}
-                mode={mode}
-                tools={tools}
-                llmKey={Boolean(llm.key.trim())}
-                onTidy={() => void tidy()}
-                onApprove={approveDeletion}
-                onReject={(verdict) =>
-                  setProposal((prev) =>
-                    prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
-                  )
-                }
-                onDismissProposal={() => setProposal(null)}
-                onNewFolder={addFolder}
-                onOpenResource={(analysisId) =>
-                  document.getElementById(`claim-${analysisId}`)?.scrollIntoView({ behavior: "smooth" })
-                }
-                onFileChanged={moveResource}
-                onSelect={select}
-                onNewChat={create}
-                onDelete={remove}
-                onOpenSettings={() => {
-                  setFace("settings");
-                  setRailOpen(true);
-                }}
-              />
-            )}
-          </aside>
-        </div>
-
-        <NavRail
-          active={face && railOpen ? face : null}
-          messages={current?.messages.filter((m) => m.role === "user").length ?? 0}
-          panelOpen={Boolean(face) && railOpen}
-          onNewMessage={create}
-          onChat={() => {
-            setFace("chat");
-            setRailOpen(true);
-          }}
-          onSettings={() => {
-            setFace(face === "settings" ? "chat" : "settings");
-            setRailOpen(true);
-          }}
-          onTogglePanel={() => {
-            if (!face) {
-              setFace("chat");
+          <ConnectorRail
+            mode={mode}
+            model={tools.model}
+            storage={tools.storage}
+            thinking={thinking}
+            onThinking={chooseThinking}
+            llmKey={Boolean(llm.key.trim())}
+            onOpenSettings={() => {
+              setFace("settings");
               setRailOpen(true);
-              return;
-            }
-            toggleRail();
-          }}
-        />
+            }}
+          />
+
+          {face === "settings" && (
+            <SettingsPanel
+              settings={llm}
+              onChange={saveLlm}
+              mode={mode}
+              model={tools.model}
+              storage={tools.storage}
+              onClose={() => setFace("files")}
+            />
+          )}
+
+          {/* Rare UI's licence asks for a visible credit wherever its components
+              ship. This is it. */}
+          <p className="mt-auto shrink-0 px-[0.25rem] text-[0.625rem] leading-[1.4] text-ink-3">
+            Components from{" "}
+            <a
+              href="https://www.rareui.com"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Rare UI
+            </a>
+          </p>
+        </aside>
       </div>
     </div>
   );
