@@ -12,6 +12,15 @@ import { assignKeys } from "@/lib/diff";
 import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
 import { RailCollapseButton, SideRail } from "@/components/SideRail";
+import { NavRail } from "@/components/NavRail";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import {
+  EMPTY_SETTINGS,
+  llmHeaders,
+  readSettings,
+  writeSettings,
+  type LlmSettings,
+} from "@/lib/byok";
 import { BeamToggle } from "@/components/BeamToggle";
 import { bandLabel } from "@/lib/score";
 import type { Analysis } from "@/lib/schema";
@@ -77,6 +86,11 @@ export default function Home() {
   const [mirofish, setMirofish] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [railOpen, setRailOpen] = useState(true);
+  // Which face of the right column is showing: the files panel, settings, or
+  // neither (a bare canvas with just the spine).
+  const [face, setFace] = useState<"chat" | "settings" | null>("chat");
+  /** The visitor's own model key, if they brought one. */
+  const [llm, setLlm] = useState<LlmSettings>(EMPTY_SETTINGS);
 
   const [stage, setStage] = useState<string | null>(null);
   const [proposal, setProposal] = useState<{ verdicts: Verdict[]; note?: string } | null>(null);
@@ -92,6 +106,7 @@ export default function Home() {
       if (stored) setAnalyses(JSON.parse(stored) as Record<string, Analysis>);
       setPanelOpen(localStorage.getItem(LS_PANEL) === "1");
       setRailOpen(localStorage.getItem(LS_RAIL) !== "0");
+      setLlm(readSettings());
       setPlans(readPlans());
     } catch {
       // A corrupt cache is not worth a dialog.
@@ -130,6 +145,23 @@ export default function Home() {
     () => workspaces.find((w) => w.id === currentId) ?? workspaces[0] ?? null,
     [workspaces, currentId]
   );
+
+  const saveLlm = useCallback((next: LlmSettings) => {
+    setLlm(next);
+    writeSettings(next);
+    // The card and the health line both read `tools`, so re-ask with the new
+    // credential rather than leaving the old model name on screen.
+    fetch("/api/settings", { headers: llmHeaders(next) })
+      .then((r) => r.json())
+      .then((data: { provider?: string | null; ai?: string }) => {
+        setTools((prev) => ({ ...prev, model: data.provider ?? prev.model }));
+        if (data.ai) setMode(data.ai === "configured" ? "live" : "demo");
+      })
+      .catch(() => undefined);
+  }, []);
+
+  /** Every model call carries the visitor's key when there is one. */
+  const modelHeaders = useMemo(() => llmHeaders(llm), [llm]);
 
   const persist = useCallback((next: Workspace[]) => {
     setWorkspaces(next);
@@ -192,7 +224,7 @@ export default function Home() {
       try {
         const response = await fetch("/api/analyze", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...modelHeaders },
           body: JSON.stringify({ text, persist: keep, ...(options?.effort ? { effort: options.effort } : {}) }),
         });
 
@@ -322,7 +354,7 @@ export default function Home() {
       try {
         const response = await fetch("/api/ask", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...modelHeaders },
           body: JSON.stringify({
             question,
             history: current.messages
@@ -530,7 +562,7 @@ export default function Home() {
     try {
       const response = await fetch("/api/organize", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...modelHeaders },
         body: JSON.stringify({ workspace: current }),
       });
       const data = (await response.json()) as {
@@ -687,55 +719,97 @@ export default function Home() {
         </main>
       </div>
 
-      {/* The rail. It folds away on its own width rather than unmounting, so
-          nothing jumps or leaves a divider behind when it closes. */}
-      <div
-        className={`hidden shrink-0 justify-end overflow-hidden border-l transition-[width,opacity,border-color] duration-200 ease-out md:flex ${
-          railOpen
-            ? "w-[15rem] border-[var(--to-border)] opacity-100"
-            : "pointer-events-none w-0 border-transparent opacity-0"
-        }`}
-      >
-        <aside
-          aria-label="Files, workspaces and connectors"
-          aria-hidden={!railOpen}
-          className="flex w-[15rem] shrink-0 flex-col gap-[0.5rem] px-[0.5rem] pb-[0.5rem] pt-[0.375rem]"
+      {/* The right column, from the outside in: a spine that is always there,
+          then the panel it opens. The spine sits outside the fold because the
+          two controls that get you unstuck — a new message, and settings —
+          cannot live inside the thing you are trying to get out of. */}
+      <div className="flex shrink-0 items-stretch">
+        <div
+          className={`relative hidden justify-end overflow-hidden border-l transition-[width,opacity,border-color] duration-200 ease-out md:flex ${
+            face && railOpen
+              ? "w-[15rem] border-[var(--to-border)] opacity-100"
+              : "pointer-events-none w-0 border-transparent opacity-0"
+          }`}
         >
-          {/* The reference's collapse affordance: two chevrons pointing out of
-              the panel, sat above the cards rather than inside them. */}
-          <div className="flex justify-end">
-            <RailCollapseButton onClick={toggleRail} />
-          </div>
-          <SideRail
-            workspace={current}
-            workspaces={workspaces.map((w) => ({
-              workspace: w,
-              reports: reportsOf(w, analyses).length,
-            }))}
-            currentId={currentId}
-            proposal={proposal}
-            tidyBusy={tidyBusy}
-            stage={busy ? stage ?? null : null}
-            mode={mode}
-            tools={tools}
-            onTidy={() => void tidy()}
-            onApprove={approveDeletion}
-            onReject={(verdict) =>
-              setProposal((prev) =>
-                prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
-              )
+          <aside
+            aria-label={face === "settings" ? "Settings" : "Files, workspaces and connectors"}
+            aria-hidden={!face || !railOpen}
+            className="relative flex w-[15rem] shrink-0 flex-col gap-[0.5rem] px-[0.5rem] pb-[0.5rem] pt-[0.375rem]"
+          >
+            <div className="flex justify-end">
+              <RailCollapseButton onClick={toggleRail} />
+            </div>
+
+            {face === "settings" ? (
+              <SettingsPanel
+                settings={llm}
+                onChange={saveLlm}
+                mode={mode}
+                model={tools.model}
+                storage={tools.storage}
+                onClose={() => setFace("chat")}
+              />
+            ) : (
+              <SideRail
+                workspace={current}
+                workspaces={workspaces.map((w) => ({
+                  workspace: w,
+                  reports: reportsOf(w, analyses).length,
+                }))}
+                currentId={currentId}
+                proposal={proposal}
+                tidyBusy={tidyBusy}
+                stage={busy ? stage ?? null : null}
+                mode={mode}
+                tools={tools}
+                llmKey={Boolean(llm.key.trim())}
+                onTidy={() => void tidy()}
+                onApprove={approveDeletion}
+                onReject={(verdict) =>
+                  setProposal((prev) =>
+                    prev ? { ...prev, verdicts: prev.verdicts.filter((v) => v !== verdict) } : prev
+                  )
+                }
+                onDismissProposal={() => setProposal(null)}
+                onNewFolder={addFolder}
+                onOpenResource={(analysisId) =>
+                  document.getElementById(`claim-${analysisId}`)?.scrollIntoView({ behavior: "smooth" })
+                }
+                onFileChanged={moveResource}
+                onSelect={select}
+                onNewChat={create}
+                onDelete={remove}
+                onOpenSettings={() => {
+                  setFace("settings");
+                  setRailOpen(true);
+                }}
+              />
+            )}
+          </aside>
+        </div>
+
+        <NavRail
+          active={face && railOpen ? face : null}
+          messages={current?.messages.filter((m) => m.role === "user").length ?? 0}
+          panelOpen={Boolean(face) && railOpen}
+          onNewMessage={create}
+          onChat={() => {
+            setFace("chat");
+            setRailOpen(true);
+          }}
+          onSettings={() => {
+            setFace(face === "settings" ? "chat" : "settings");
+            setRailOpen(true);
+          }}
+          onTogglePanel={() => {
+            if (!face) {
+              setFace("chat");
+              setRailOpen(true);
+              return;
             }
-            onDismissProposal={() => setProposal(null)}
-            onNewFolder={addFolder}
-            onOpenResource={(analysisId) =>
-              document.getElementById(`claim-${analysisId}`)?.scrollIntoView({ behavior: "smooth" })
-            }
-            onFileChanged={moveResource}
-            onSelect={select}
-            onNewChat={create}
-            onDelete={remove}
-          />
-        </aside>
+            toggleRail();
+          }}
+        />
       </div>
     </div>
   );

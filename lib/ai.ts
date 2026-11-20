@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
+import { visitorCredential } from "./visitor";
 import {
   geminiKey,
   geminiModel,
@@ -34,12 +35,23 @@ export function MODEL(): string {
 }
 
 export function provider(): Provider {
+  // A visitor's key decides on its own, whatever the deployment holds.
+  const visitor = visitorCredential();
+  if (visitor) return visitor.provider;
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
   if (geminiKey()) return "gemini";
   return "anthropic";
 }
 
+/** The Anthropic key in play: the visitor's, or the deployment's. */
+export function anthropicKey(): string | null {
+  const visitor = visitorCredential();
+  if (visitor?.provider === "anthropic") return visitor.key;
+  return process.env.ANTHROPIC_API_KEY ?? null;
+}
+
 export function hasApiKey(): boolean {
+  if (visitorCredential()) return true;
   return Boolean(process.env.ANTHROPIC_API_KEY ?? geminiKey());
 }
 
@@ -61,7 +73,7 @@ export function describeProvider(): {
 }
 
 export function client(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = anthropicKey();
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
   return new Anthropic({ apiKey, maxRetries: 2 });
 }

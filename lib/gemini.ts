@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { visitorCredential } from "./visitor";
 
 /**
  * Gemini, over its REST API.
@@ -17,7 +18,15 @@ import { z } from "zod";
  */
 export const GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
 
+/**
+ * The key this call runs on: the visitor's, when this request brought one, and
+ * the deployment's otherwise. Order matters — a visitor who pasted their own key
+ * must never spend the operator's budget, and the operator's key must never be
+ * used for a request that asked not to.
+ */
 export function geminiKey(): string | null {
+  const visitor = visitorCredential();
+  if (visitor?.provider === "gemini") return visitor.key;
   return (
     process.env.GEMINI_API_KEY ??
     process.env.GOOGLE_GENERATIVE_AI_API_KEY ??
