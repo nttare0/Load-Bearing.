@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Search, Trash2 } from "lucide-react";
 import { AnimatedCounter } from "@/components/rare/animated-counter";
 import { DeleteButton } from "@/components/rare/delete-button";
-import { CardHead, CARD, IconButton, InlineInput } from "@/components/rail/parts";
+import { Card, CardTitle } from "@/components/rail/panels";
+import { IconButton, InlineInput } from "@/components/rail/parts";
 import type { Workspace } from "@/lib/workspace";
 
 /**
@@ -46,8 +47,8 @@ export function WorkspaceRail({
     : workspaces;
 
   return (
-    <section className={`${CARD} flex min-h-0 flex-1 flex-col overflow-hidden`}>
-      <CardHead title="Chats">
+    <Card grow>
+      <CardTitle title="Chats">
         <AnimatedCounter
           value={workspaces.length}
           separator=""
@@ -60,7 +61,7 @@ export function WorkspaceRail({
         >
           <Search aria-hidden className="size-4" />
         </IconButton>
-      </CardHead>
+      </CardTitle>
 
       {searching && (
         <InlineInput
@@ -159,6 +160,6 @@ export function WorkspaceRail({
         </span>
         New chat
       </button>
-    </section>
+    </Card>
   );
 }

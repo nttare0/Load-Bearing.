@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowUpRight, Settings2 } from "lucide-react";
 import { ConnectorList, useConnectors } from "@/components/Connectors";
-import { CardHead, CARD } from "@/components/rail/parts";
+import { Card, CardTitle } from "@/components/rail/panels";
 
 /**
  * Connectors, alone in the right column.
@@ -19,19 +20,17 @@ export function ConnectorRail({
   model,
   storage,
   llmKey,
-  onOpenSettings,
 }: {
   mode: "demo" | "live" | null;
   model: string | null;
   storage: string | null;
   llmKey: boolean;
-  onOpenSettings: () => void;
 }) {
   const connectors = useConnectors({ mode, model, storage });
 
   return (
-    <section className={CARD}>
-      <CardHead title="Connectors">
+    <Card>
+      <CardTitle title="Connectors">
         {llmKey && (
           <span
             className="shrink-0 text-[0.625rem] text-ink-3"
@@ -40,25 +39,25 @@ export function ConnectorRail({
             your key
           </span>
         )}
-        <button
-          type="button"
-          onClick={onOpenSettings}
+        {/* Settings is a page, so this is a link — middle-clickable, focusable,
+            and visible in the status bar as somewhere it is going. */}
+        <Link
+          href="/settings"
           aria-label="Open settings"
           title="Open settings"
           className="shrink-0 rounded-[0.25rem] p-[0.125rem] text-ink-3 hover:bg-[var(--to-surface-2)] hover:text-foreground"
         >
           <Settings2 aria-hidden className="size-4" />
-        </button>
-      </CardHead>
+        </Link>
+      </CardTitle>
       <ConnectorList connectors={connectors} />
-      <button
-        type="button"
-        onClick={onOpenSettings}
+      <Link
+        href="/settings"
         className="flex w-full items-center gap-[0.25rem] border-t border-[var(--to-border)] px-[0.625rem] py-[0.3125rem] text-left text-[0.75rem] text-ink-3 hover:bg-[var(--to-surface-2)] hover:text-foreground"
       >
         Manage model keys and connectors
         <ArrowUpRight aria-hidden className="size-3 shrink-0" />
-      </button>
-    </section>
+      </Link>
+    </Card>
   );
 }
