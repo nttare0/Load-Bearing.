@@ -98,6 +98,23 @@ export async function runPipeline(
 ): Promise<Analysis> {
   const notes: string[] = [];
   /**
+   * Emit one thinking step, timed against the previous one.
+   *
+   * The duration matters more than it looks: it is what lets the collapsed
+   * summary say where the time went, and what lets a person see that "checking
+   * sources" was instant because nothing was searched.
+   */
+  let reasonMark = Date.now();
+  const reason = (
+    pass: string,
+    kind: "think" | "found" | "check" | "warn",
+    text: string
+  ) => {
+    const now = Date.now();
+    emit({ type: "reason", pass, kind, text, ms: now - reasonMark });
+    reasonMark = now;
+  };
+  /**
    * Every pass that silently ran on a fallback model. Collected rather than
    * printed per pass, because it is one fact about the run: the model on the
    * box was not the model that did the work.
@@ -123,6 +140,7 @@ export async function runPipeline(
   // that can degrade instead: a report without the model is thinner and says
   // so, which is more useful than an error page over a working rubric.
   emit({ type: "stage", stage: "extract", detail: "Reading the plan and quoting the claims it states." });
+  reason("extract", "think", "reading the plan for claims it states outright");
 
   let extraction: {
     data: { summary: string; claims: RawClaim[] };
@@ -137,6 +155,11 @@ export async function runPipeline(
       maxTokens: 4096,
     });
     noteSwap(extraction);
+    reason(
+      "extract",
+      "found",
+      `found ${extraction.data.claims.length} claim${extraction.data.claims.length === 1 ? "" : "s"} the plan states`
+    );
   } catch (error) {
     // A model that cannot answer is a reason to say less, not to stop.
     const fallback = heuristicClaims(planText);
@@ -150,6 +173,7 @@ export async function runPipeline(
     notes.push(
       `No model answered the extraction pass (${short(error)}). These claims were read straight from the text with no model: the quotes are exact, the scores are conservative, and the hidden assumptions are missing. Run it again to get the full report.`
     );
+    reason("extract", "warn", "no model answered — reading the sentences directly instead");
     extraction = {
       data: {
         summary: `Read without a model: the ${fallback.length} sentences in this plan that assert something about money, timing, people or a third party.`,
@@ -188,6 +212,7 @@ export async function runPipeline(
   }
 
   // ---------- Pass 2: hidden assumptions ----------
+  reason("premortem", "think", "imagining this has already failed, and why");
   emit({
     type: "stage",
     stage: "premortem",
@@ -196,6 +221,7 @@ export async function runPipeline(
 
   let hiddenClaims: Claim[] = [];
   try {
+    reason("hidden", "think", "looking for what the plan depends on but never says");
     const hidden = await structuredPass({
       system: HIDDEN_PROMPT,
       user: [
@@ -228,6 +254,13 @@ export async function runPipeline(
     });
     const statedText = new Set(stated.map((c) => c.claim.toLowerCase().replace(/[^a-z ]/g, "")));
     hiddenClaims = hiddenClaims.filter((c) => !statedText.has(c.claim.toLowerCase().replace(/[^a-z ]/g, "")));
+    reason(
+      "hidden",
+      hiddenClaims.length > 0 ? "found" : "warn",
+      hiddenClaims.length > 0
+        ? `${hiddenClaims.length} assumption${hiddenClaims.length === 1 ? "" : "s"} the plan relies on but never states`
+        : "nothing hidden surfaced — the plan says everything it depends on"
+    );
   } catch (error) {
     notes.push(
       `The hidden-assumption pass failed (${short(error)}), so this report only shows claims the plan states.`
@@ -267,6 +300,11 @@ export async function runPipeline(
 
     const refs = new Set(claims.map((c) => c.ref));
     failureModes = premortem.data.failureModes.filter((f) => refs.has(f.claimRef));
+    reason(
+      "premortem",
+      "found",
+      `${failureModes.length} way${failureModes.length === 1 ? "" : "s"} this most plausibly fails`
+    );
     emit({ type: "failureModes", failureModes });
   } catch (error) {
     notes.push(`Pre-mortem pass failed (${short(error)}). Rankings and tests are unaffected.`);
@@ -275,6 +313,7 @@ export async function runPipeline(
 
   // ---------- Pass 4: scoring audit ----------
   emit({ type: "stage", stage: "score", detail: "Re-scoring every claim against the rubric to catch drift." });
+  reason("score", "check", "scoring every claim a second time, to catch the first pass drifting");
   try {
     const audit = await structuredPass({
       system: SCORING_PROMPT,
@@ -324,6 +363,14 @@ export async function runPipeline(
         ...(disagreed ? { audit: disagreed } : {}),
       };
     });
+    const moved = claims.filter((c) => c.audit);
+    reason(
+      "score",
+      moved.length > 0 ? "warn" : "check",
+      moved.length > 0
+        ? `${moved.length} claim${moved.length === 1 ? "" : "s"} scored differently the second time; the audit score wins`
+        : "the second pass agreed with the first on every claim"
+    );
     claims = rankAndCleanClaims(claims);
   } catch (error) {
     notes.push(`Scoring audit failed (${short(error)}); showing the first pass's scores unverified.`);
@@ -339,7 +386,15 @@ export async function runPipeline(
       stage: "evidence",
       detail: `Checking ${searchable.length} checkable claim${searchable.length > 1 ? "s" : ""} against public sources.`,
     });
+    reason("evidence", "check", `checking ${searchable.length} claim${searchable.length === 1 ? "" : "s"} against public sources`);
     const run = await gatherEvidence(searchable.map((c) => ({ ref: c.ref, claim: c.claim })));
+    reason(
+      "evidence",
+      run.evidence.length > 0 ? "found" : "warn",
+      run.evidence.length > 0
+        ? `found ${run.evidence.length} source${run.evidence.length === 1 ? "" : "s"}`
+        : "no source could be tied to a claim, so they stay unverified"
+    );
     notes.push(...run.notes);
     const grouped = byRef(run.evidence);
     claims = claims.map((c) => {
@@ -356,6 +411,7 @@ export async function runPipeline(
   passes.push({ stage: "evidence", ms: Date.now() - evidenceStart });
 
   // ---------- Pass 5: test design on the top claims ----------
+  reason("tests", "think", `designing the cheapest disproof for the top ${Math.min(MAX_TEST_CLAIMS, claims.length)} claims`);
   emit({
     type: "stage",
     stage: "tests",
@@ -405,6 +461,11 @@ export async function runPipeline(
     if (claims.slice(0, MAX_TEST_CLAIMS).some((c) => !c.test)) {
       notes.push("Some top claims came back without a test; they are marked as untested.");
     }
+    reason(
+      "tests",
+      "found",
+      `${tests.data.tests.length} test${tests.data.tests.length === 1 ? "" : "s"} designed, cheapest first`
+    );
     emit({ type: "tests", claims });
   } catch (error) {
     notes.push(`Test-design pass failed (${short(error)}), so claims have no tests yet.`);

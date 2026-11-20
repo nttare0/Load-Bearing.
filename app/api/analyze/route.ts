@@ -96,31 +96,56 @@ function humanise(message: string): string {
   return message;
 }
 
-/** Emits the worked example from the plan, same shape as a live run. */
+/**
+ * Emits the worked example from the plan, same shape as a live run — including
+ * the thinking steps, because the reasoning panel is part of the interface and
+ * a demo that skipped it would be showing a different product.
+ */
 async function streamDemo(send: (event: PipelineEvent) => void) {
   const analysis = demoAnalysis();
   const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const reason = (pass: string, kind: "think" | "found" | "check" | "warn", text: string, ms: number) =>
+    send({ type: "reason", pass, kind, text, ms });
 
-  send({ type: "stage", stage: "extract", detail: "Demo mode — no ANTHROPIC_API_KEY set, so this is the worked example from the build plan." });
+  send({
+    type: "stage",
+    stage: "extract",
+    detail: "Demo mode — no key is configured, so this is the worked example from the build plan.",
+  });
+  reason("extract", "think", "reading the plan for claims it states outright", 420);
   await delay(500);
-  send({ type: "stage", stage: "premortem", detail: "Looking for what must be true that nobody wrote down." });
+  reason("extract", "found", `found ${analysis.claims.length} claims the plan states`, 380);
   await delay(400);
+
+  send({ type: "stage", stage: "premortem", detail: "Looking for what must be true that nobody wrote down." });
+  reason("hidden", "think", "looking for what the plan depends on but never says", 300);
+  await delay(400);
+  reason("hidden", "warn", "demo mode does not call a model, so no hidden assumptions are generated", 200);
+  await delay(300);
+
   send({
     type: "claims",
     claims: analysis.claims.map((c) => ({ ...c, test: null, evidence: [] })),
     summary: analysis.summary,
     title: analysis.title,
-    notes: ["Running on the built-in example. Add ANTHROPIC_API_KEY to analyse your own plan."],
+    notes: ["Running on the built-in example. Add a model key in Settings to analyse your own plan."],
   });
-  await delay(700);
+
+  reason("premortem", "found", `${analysis.failureModes.length} ways this most plausibly fails`, 700);
   send({ type: "failureModes", failureModes: analysis.failureModes });
   await delay(500);
+
   send({ type: "stage", stage: "evidence", detail: "Checking 2 checkable claims against public sources." });
+  reason("evidence", "check", "checking 2 claims against public sources", 500);
   await delay(500);
+  reason("evidence", "warn", "demo mode does not search, so nothing is verified", 120);
   send({ type: "evidence", evidence: [], notes: ["Demo mode does not call the web."] });
   await delay(400);
+
   send({ type: "stage", stage: "tests", detail: "Designing the cheapest disproof for the top claims." });
-  await delay(500);
+  reason("tests", "think", "designing the cheapest disproof for the top claims", 300);
+  await delay(400);
+  reason("tests", "found", `${analysis.claims.filter((c) => c.test).length} tests designed, cheapest first`, 220);
   send({ type: "tests", claims: analysis.claims });
   await delay(200);
   send({ type: "done", analysis, persisted: false });

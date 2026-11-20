@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import { FlaskConical, MessageSquare, Search, Sparkles } from "lucide-react";
 import { CollapsibleRow } from "@/components/CollapsibleRow";
 import { PassTrace } from "@/components/PassTrace";
+import { ReasoningPanel } from "@/components/ReasoningPanel";
 import { Report } from "@/components/Report";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,13 @@ export function Thread({
 
             {analysis && (
               <Fragment>
+                {/* The thinking, folded, above the answer it produced — the same
+                    order it happened in. It is collapsed here because this turn
+                    is finished: the summary is what you want when rereading, and
+                    the steps are one click away if the ranking looks wrong. */}
+                {message.reasoning && message.reasoning.length > 0 && (
+                  <ReasoningPanel steps={message.reasoning} running={false} finished />
+                )}
                 <CollapsibleRow
                   icon={<FlaskConical aria-hidden className="size-3.5 shrink-0 text-ink-3" />}
                   label={analysis.title}

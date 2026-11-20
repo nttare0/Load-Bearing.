@@ -35,6 +35,14 @@ export type Message = {
   passes?: { stage: string; ms: number }[];
   /** Naming what this turn looked at, so a thread is auditable. */
   lookedAt?: { analyses: number; claims: number; tested: number };
+  /**
+   * The thinking steps this turn produced.
+   *
+   * Kept with the turn rather than thrown away when the report renders: the
+   * reasoning panel collapses to a summary, but the summary is only honest if
+   * the steps behind it are still there to open.
+   */
+  reasoning?: { pass: string; kind: "think" | "found" | "check" | "warn"; text: string; ms?: number }[];
 };
 
 export type Workspace = {
