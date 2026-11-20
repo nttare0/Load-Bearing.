@@ -1,171 +1,109 @@
 "use client";
 
-import { useRef } from "react";
-import {
-  Brain,
-  ChevronLeft,
-  FolderTree,
-  MessageSquarePlus,
-  PanelLeftClose,
-  Settings2,
-} from "lucide-react";
-import { EFFORTS, THINKING, type Effort } from "@/lib/effort";
+import { Files, MessagesSquare, PanelLeft, Plus, Settings2 } from "lucide-react";
 
 /**
- * The spine, on the left edge.
+ * The left sidebar.
  *
- * It used to be on the right, which put it between the app and the files it was
- * opening. It belongs on the left, where a person's eye starts: the destinations
- * first, then the thread, then the things belonging to the thread on the right.
+ * The first version was wrong in a way worth naming: a column of unlabelled
+ * icons, one of which was a brain that changed a value rather than going
+ * anywhere, with a paragraph of legend underneath explaining the icons. If a
+ * menu needs a key, the menu is the problem.
  *
- * Four controls, in the order they are reached for:
+ * What it does now:
  *
- *   new chat · workspaces · files & activity · settings
- *
- * and, pinned to the bottom, the current thinking level — because "how hard is
- * it thinking" is a setting a person wants to see without opening settings.
+ *   - **every item is a place, and every item is named.** Icon over a 9px label,
+ *     in a 56px column. Nothing here sets a value; the thinking level lives in
+ *     Settings, which is where it can be explained.
+ *   - **the two panels are independent.** Workspaces on the left, Files and
+ *     Connectors on the right, and either can be closed without the other. The
+ *     pressed state tells you which is open, so the sidebar is a status as well
+ *     as a menu.
+ *   - **new chat is primary**, separated above the destinations by a rule and
+ *     by a filled surface.
  */
 const ITEM =
-  "relative flex size-[1.875rem] items-center justify-center rounded-[0.375rem] text-ink-3 transition-colors hover:bg-[var(--to-surface-2)] hover:text-foreground";
+  "flex w-full flex-col items-center gap-[0.1875rem] rounded-[0.4375rem] px-[0.125rem] py-[0.375rem] text-ink-3 transition-colors hover:bg-[var(--to-surface-2)] hover:text-foreground";
+const ON = "bg-[var(--to-surface-2)] text-foreground shadow-[inset_0_0_0_1px_var(--to-border)]";
 
 export function NavRail({
-  active,
-  workspaces,
-  thinking,
-  onThinking,
+  workspacesOpen,
+  filesOpen,
+  settingsOpen,
   onNewChat,
   onWorkspaces,
   onFiles,
   onSettings,
-  onTogglePanel,
+  onCollapse,
 }: {
-  active: "workspaces" | "files" | "settings" | null;
-  /** How many chats there are, for the count beside the workspaces icon. */
-  workspaces: number;
-  thinking: Effort;
-  onThinking: (effort: Effort) => void;
+  workspacesOpen: boolean;
+  filesOpen: boolean;
+  settingsOpen: boolean;
   onNewChat: () => void;
   onWorkspaces: () => void;
   onFiles: () => void;
   onSettings: () => void;
-  onTogglePanel: () => void;
+  onCollapse: () => void;
 }) {
   return (
     <nav
-      aria-label="Chat, workspaces, files and settings"
-      className="hidden w-[2.25rem] shrink-0 flex-col items-center gap-[0.125rem] border-r border-[var(--to-border)] py-[0.375rem] md:flex"
+      aria-label="Chats, files and settings"
+      className="hidden w-[3.5rem] shrink-0 flex-col items-center gap-[0.125rem] border-r border-[var(--to-border)] bg-[var(--to-surface)] px-[0.25rem] py-[0.5rem] md:flex"
     >
       <button
         type="button"
         onClick={onNewChat}
-        aria-label="New chat"
         title="New chat — starts its own workspace"
-        className={ITEM}
+        className="flex w-full flex-col items-center gap-[0.1875rem] rounded-[0.4375rem] border border-[var(--to-border)] bg-[var(--to-bg)] px-[0.125rem] py-[0.375rem] text-ink-2 transition-colors hover:border-[var(--to-border-strong)] hover:text-foreground"
       >
-        <MessageSquarePlus aria-hidden className="size-4" />
+        <Plus aria-hidden className="size-[1.125rem]" />
+        <span className="text-[0.5625rem] leading-none">New chat</span>
       </button>
 
-      <RailItem label="Workspaces" current={active === "workspaces"} onClick={onWorkspaces} badge={workspaces}>
-        <FolderTree aria-hidden className="size-4" />
-      </RailItem>
+      <span aria-hidden className="my-[0.375rem] h-px w-[1.75rem] bg-[var(--to-border)]" />
 
-      <RailItem label="Files and activity" current={active === "files"} onClick={onFiles}>
-        <PanelLeftClose aria-hidden className="size-4" />
-      </RailItem>
+      <Item label="Chats" on={workspacesOpen} onClick={onWorkspaces} pressed={workspacesOpen}>
+        <MessagesSquare aria-hidden className="size-[1.125rem]" />
+      </Item>
 
-      <span aria-hidden className="my-[0.25rem] h-px w-[1.125rem] bg-[var(--to-border)]" />
+      <Item label="Files" on={filesOpen} onClick={onFiles} pressed={filesOpen}>
+        <Files aria-hidden className="size-[1.125rem]" />
+      </Item>
 
-      <RailItem label="Settings" current={active === "settings"} onClick={onSettings}>
-        <Settings2 aria-hidden className="size-4" />
-      </RailItem>
-
-      {/* The thinking level, cycling in place: low → medium → high → low. It is
-          a setting, but it is one whose value matters on every message, so it
-          gets a permanent home rather than a row inside a sheet. */}
-      <ThinkingCycle effort={thinking} onCycle={onThinking} />
+      <Item label="Settings" on={settingsOpen} onClick={onSettings} pressed={settingsOpen}>
+        <Settings2 aria-hidden className="size-[1.125rem]" />
+      </Item>
 
       <button
         type="button"
-        onClick={onTogglePanel}
-        aria-label="Hide the side panel"
-        title="Hide the side panel"
+        onClick={onCollapse}
+        title="Hide the side panels"
         className={`${ITEM} mt-auto`}
       >
-        <ChevronLeft aria-hidden className="size-4" />
+        <PanelLeft aria-hidden className="size-[1.125rem]" />
+        <span className="text-[0.5625rem] leading-none">Hide</span>
       </button>
     </nav>
   );
 }
 
-function RailItem({
+function Item({
   label,
-  current,
+  on,
+  pressed,
   onClick,
-  badge,
   children,
 }: {
   label: string;
-  current: boolean;
+  on: boolean;
+  pressed: boolean;
   onClick: () => void;
-  badge?: number;
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      aria-current={current ? "page" : undefined}
-      title={label}
-      className={`${ITEM} ${current ? "bg-[var(--to-surface-2)] text-foreground" : ""}`}
-    >
+    <button type="button" onClick={onClick} aria-pressed={pressed} className={`${ITEM} ${on ? ON : ""}`}>
       {children}
-      {Boolean(badge) && (
-        <span className="pointer-events-none absolute -right-[0.0625rem] -top-[0.0625rem] min-w-[0.75rem] rounded-[var(--to-radius-pill)] bg-[var(--to-surface-2)] px-[0.1875rem] text-center text-[0.5rem] leading-[0.75rem] tabular-nums text-ink-3">
-          {badge! > 99 ? "99" : badge}
-        </span>
-      )}
-    </button>
-  );
-}
-
-/**
- * One button that shows the level and steps it.
- *
- * The three dots beneath it are the cheapest possible legend: filled means how
- * far up the scale you are. Cycling beats a menu here — there are three states
- * and no ambiguity about which one you are in.
- */
-function ThinkingCycle({ effort, onCycle }: { effort: Effort; onCycle: (effort: Effort) => void }) {
-  const index = EFFORTS.indexOf(effort);
-  const spec = THINKING[effort];
-  // A double-click flies past a level, so hold the step count to one per tap.
-  const busy = useRef(false);
-
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        if (busy.current) return;
-        busy.current = true;
-        window.setTimeout(() => (busy.current = false), 180);
-        onCycle(EFFORTS[(index + 1) % EFFORTS.length]);
-      }}
-      aria-label={`Thinking: ${spec.label}. Press to change.`}
-      title={`Thinking: ${spec.label} — ${spec.detail}`}
-      className={`${ITEM} mt-[0.25rem] flex-col gap-0`}
-    >
-      <Brain aria-hidden className="size-4" />
-      <span aria-hidden className="mt-[0.0625rem] flex items-center gap-[0.125rem]">
-        {EFFORTS.map((step, i) => (
-          <span
-            key={step}
-            className={`size-[0.1875rem] rounded-full transition-colors ${
-              i <= index ? "bg-[var(--to-accent)]" : "bg-[var(--to-border-strong)]"
-            }`}
-          />
-        ))}
-      </span>
+      <span className="text-[0.5625rem] leading-none">{label}</span>
     </button>
   );
 }
