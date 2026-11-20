@@ -10,6 +10,7 @@ import {
   Loader2,
   Plus,
   Search,
+  Settings2,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -70,6 +71,8 @@ export function SideRail({
   onSelect,
   onNewChat,
   onDelete,
+  llmKey,
+  onOpenSettings,
 }: {
   workspace: Workspace | null;
   workspaces: { workspace: Workspace; reports: number }[];
@@ -91,6 +94,10 @@ export function SideRail({
   onSelect: (id: string) => void;
   onNewChat: () => void;
   onDelete: (id: string) => void;
+  /** True when this browser is running on the visitor's own key. */
+  llmKey: boolean;
+  /** Opens the settings sheet, where a key is pasted and connectors explained. */
+  onOpenSettings: () => void;
 }) {
   // Files is where you land — unless the model is waiting on you, in which case
   // the question is the first thing in the rail, not something you must find.
@@ -476,10 +483,22 @@ export function SideRail({
         </ul>
       </section>
 
-      {/* Connectors: what this deployment is actually wired to. */}
+      {/* Connectors: what this deployment is actually wired to, and the way in
+          to changing the one part of it a visitor can change. */}
       <section className={`${CARD} shrink-0`}>
         <div className={HEAD_ROW}>
           <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-ink-2">Connectors</span>
+          {llmKey && (
+            <span
+              className="shrink-0 text-[0.625rem] text-ink-3"
+              title="Analysis runs on the key you pasted in Settings"
+            >
+              your key
+            </span>
+          )}
+          <IconButton label="Open settings" onClick={onOpenSettings}>
+            <Settings2 aria-hidden className="size-4" />
+          </IconButton>
         </div>
         <ConnectorList connectors={connectors} />
       </section>

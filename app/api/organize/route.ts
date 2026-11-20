@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { hasApiKey, structuredPass } from "@/lib/ai";
+import { credentialFrom, withVisitor } from "@/lib/visitor";
 import { parseActions, plan, type ResourceAction } from "@/lib/resources";
 import type { Workspace } from "@/lib/workspace";
 
@@ -55,9 +56,12 @@ export async function POST(request: Request) {
     return Response.json({ error: "Send the workspace to organise." }, { status: 400 });
   }
 
+  const { credential, error: credentialError } = credentialFrom(request);
+  if (credentialError) return Response.json({ error: credentialError }, { status: 400 });
+
   // Demo mode has no model. It still answers, but with nothing — an inbox that
   // quietly stays where it is, rather than a fake reorganisation.
-  if (!hasApiKey()) {
+  if (!hasApiKey() && !credential) {
     return Response.json({
       actions: [] as ResourceAction[],
       verdicts: [],
@@ -91,12 +95,14 @@ export async function POST(request: Request) {
   ].join("\n");
 
   try {
-    const result = await structuredPass({
-      system: SYSTEM,
-      user,
-      schema: ActionSchema,
-      maxTokens: 1500,
-    });
+    const result = await withVisitor(credential, () =>
+      structuredPass({
+        system: SYSTEM,
+        user,
+        schema: ActionSchema,
+        maxTokens: 1500,
+      })
+    );
 
     const actions = parseActions(result.data);
     const verdicts = plan(actions, workspace);

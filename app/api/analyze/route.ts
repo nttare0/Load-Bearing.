@@ -4,6 +4,7 @@ import { NOT_A_PLAN_RESPONSE } from "@/lib/prompts";
 import { saveAnalysis } from "@/lib/store";
 import { demoAnalysis } from "@/lib/demo";
 import { thinkingFor } from "@/lib/effort";
+import { credentialFrom, withVisitor } from "@/lib/visitor";
 import type { Analysis, PipelineEvent } from "@/lib/schema";
 
 export const runtime = "nodejs";
@@ -17,6 +18,13 @@ export async function POST(request: Request) {
     body = await request.json();
   } catch {
     return Response.json({ error: "Send JSON with a text field." }, { status: 400 });
+  }
+
+  // A visitor's own key, when they brought one. Checked before anything runs:
+  // a malformed key should be a sentence, not a five-pass failure.
+  const { credential, error: credentialError } = credentialFrom(request);
+  if (credentialError) {
+    return Response.json({ error: credentialError }, { status: 400 });
   }
 
   const text = typeof body.text === "string" ? body.text.trim() : "";
@@ -43,16 +51,20 @@ export async function POST(request: Request) {
       };
 
       try {
-        if (!hasApiKey()) {
-          // Demo mode: no key configured, so run the worked example from the
-          // build plan through the same event stream. The UI is fully usable.
-          await streamDemo(send);
-          return;
-        }
+        // Everything that touches a model happens inside this scope, so the
+        // visitor's key reaches all five passes without any of them knowing.
+        await withVisitor(credential, async () => {
+          if (!hasApiKey()) {
+            // Demo mode: no key anywhere, so run the worked example from the
+            // build plan through the same event stream. The UI is fully usable.
+            await streamDemo(send);
+            return;
+          }
 
-        await runPipeline(text, send, {
-          ...(persist ? { persist: (analysis: Analysis) => saveAnalysis(analysis) } : {}),
-          ...(thinkingLevel ? { thinkingLevel } : {}),
+          await runPipeline(text, send, {
+            ...(persist ? { persist: (analysis: Analysis) => saveAnalysis(analysis) } : {}),
+            ...(thinkingLevel ? { thinkingLevel } : {}),
+          });
         });
       } catch (error) {
         const message =

@@ -1,4 +1,5 @@
 import { hasApiKey, prose } from "@/lib/ai";
+import { credentialFrom, withVisitor } from "@/lib/visitor";
 import type { Analysis } from "@/lib/schema";
 
 export const runtime = "nodejs";
@@ -85,7 +86,11 @@ export async function POST(request: Request) {
     return Response.json({ error: "That question is long. Keep it under 2,000 characters." }, { status: 413 });
   }
 
-  if (!hasApiKey()) {
+  // A malformed key is a sentence, not a silent fall back to the deployment's.
+  const { credential, error: credentialError } = credentialFrom(request);
+  if (credentialError) return Response.json({ error: credentialError }, { status: 400 });
+
+  if (!hasApiKey() && !credential) {
     return Response.json({ answer: demoAnswer(body), mode: "demo" });
   }
 
@@ -109,7 +114,7 @@ ${context.notes?.length ? `\nPipeline notes:\n${context.notes.map((n) => `- ${n}
   }));
 
   try {
-    const { text } = await prose({
+    const { text } = await withVisitor(credential, () => prose({
       system: SYSTEM,
       maxTokens: 1024,
       turns: [
@@ -118,7 +123,7 @@ ${context.notes?.length ? `\nPipeline notes:\n${context.notes.map((n) => `- ${n}
         ...history,
         { role: "user", content: question },
       ],
-    });
+    }));
 
     return Response.json({ answer: text || "The model returned nothing. Ask again.", mode: "live" });
   } catch (error) {
