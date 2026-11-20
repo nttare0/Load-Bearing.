@@ -9,29 +9,29 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { AiStatus } from "@/components/rare/ai-status";
 import { DeleteButton } from "@/components/rare/delete-button";
-import { CARD, FULL_ROW, InlineInput, Tab } from "@/components/rail/parts";
+import { Card, CardTitle, Panel } from "@/components/rail/panels";
+import { FULL_ROW, InlineInput, Tab } from "@/components/rail/parts";
 import { tree, type Verdict } from "@/lib/resources";
 import type { Workspace } from "@/lib/workspace";
 
 /**
- * Files and Activity, in their own card.
+ * Files and Activity, each in its own card, in the right panel.
  *
- * They used to sit above Workspaces in one stack. Splitting them out is what
- * lets the left column be *where you are* and the right column be *what is in
- * it* — the two questions a person holds at once, and the reason they were
- * confusing when both answered from the same column.
+ * The cards are direct children of `Panel` — there is no wrapper div between
+ * them, which was the specific thing that made this column hard to change: two
+ * levels of `flex flex-col gap-…` meant a card's actual container depended on
+ * markup that carried no meaning.
  *
- * Nothing here deletes on its own: a deletion arrives in Activity as one line
- * with the model's own reason beside it, and the bin must be pressed twice.
+ * Files and Activity share one card because they are one thing — what this
+ * workspace has produced — separated by a tab stop and nothing else. What runs
+ * live is a *separate* card above them, because a stage in progress is not a
+ * document and should not appear to be one.
  */
 export function FileRail({
   workspace,
   proposal,
   tidyBusy,
-  stage,
-  mode,
   onTidy,
   onApprove,
   onReject,
@@ -43,8 +43,6 @@ export function FileRail({
   workspace: Workspace | null;
   proposal: { verdicts: Verdict[]; note?: string } | null;
   tidyBusy: boolean;
-  stage: string | null;
-  mode: "demo" | "live" | null;
   onTidy: () => void;
   onApprove: (verdict: Verdict) => void;
   onReject: (verdict: Verdict) => void;
@@ -83,236 +81,251 @@ export function FileRail({
   const empty = !view || (view.root.length === 0 && view.folders.every((f) => f.items.length === 0));
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-[0.5rem]">
-      {/* What the run is doing right now, above the files it is producing. */}
-      {stage && (
-        <div className={`${CARD} shrink-0 px-[0.5rem] py-[0.3125rem]`}>
-          <AiStatus
-            state={statusState(stage)}
-            label={stage}
-            detail={mode === "demo" ? "demo" : undefined}
-            className="h-6 gap-[0.375rem] text-[0.8125rem] text-ink-2 dark:text-ink-2"
-          />
-        </div>
-      )}
+    <Card grow>
+      <div role="tablist" aria-label="Files and activity" className="flex shrink-0 gap-[0.375rem] p-[0.25rem]">
+        <Tab
+          label="Files"
+          active={tab === "files"}
+          onSelect={() => setPicked("files")}
+          controls="panel-files"
+        />
+        <Tab
+          label="Activity"
+          active={tab === "activity"}
+          onSelect={() => setPicked("activity")}
+          badge={pending.length}
+          controls="panel-activity"
+        />
+      </div>
 
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div role="tablist" aria-label="Files and activity" className="flex shrink-0 gap-[0.375rem]">
-          <Tab
-            label="Files"
-            active={tab === "files"}
-            onSelect={() => setPicked("files")}
-            controls="panel-files"
-          />
-          <Tab
-            label="Activity"
-            active={tab === "activity"}
-            onSelect={() => setPicked("activity")}
-            badge={pending.length}
-            controls="panel-activity"
-          />
-        </div>
+      {tab === "files" ? (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setCreating((value) => !value);
+              setDraft("");
+            }}
+            className={FULL_ROW}
+          >
+            <FolderPlus aria-hidden className="size-4 shrink-0 text-ink-3" />
+            New folder
+            <ChevronRight aria-hidden className="ml-auto size-4 shrink-0 text-ink-3" />
+          </button>
 
-        {tab === "files" ? (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                setCreating((value) => !value);
+          {creating && (
+            <InlineInput
+              value={draft}
+              onChange={setDraft}
+              placeholder="Folder name"
+              onSubmit={commitFolder}
+              onCancel={() => {
                 setDraft("");
+                setCreating(false);
               }}
-              className={FULL_ROW}
-            >
-              <FolderPlus aria-hidden className="size-4 shrink-0 text-ink-3" />
-              New folder
-              <ChevronRight aria-hidden className="ml-auto size-4 shrink-0 text-ink-3" />
-            </button>
+            />
+          )}
 
-            {creating && (
-              <InlineInput
-                value={draft}
-                onChange={setDraft}
-                placeholder="Folder name"
-                onSubmit={commitFolder}
-                onCancel={() => {
-                  setDraft("");
-                  setCreating(false);
-                }}
-              />
+          <div className="min-h-0 flex-1 overflow-y-auto py-[0.1875rem]">
+            {empty && !creating && (
+              <p className="px-[0.625rem] py-[0.375rem] text-[0.8125rem] leading-[1.5] text-ink-3">
+                Reports and notes collect here once you run a plan. Make a folder to keep them
+                apart.
+              </p>
             )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto py-[0.1875rem]">
-              {empty && !creating && (
-                <p className="px-[0.625rem] py-[0.375rem] text-[0.8125rem] leading-[1.5] text-ink-3">
-                  Reports and notes collect here once you run a plan. Make a folder to keep them
-                  apart.
-                </p>
-              )}
-
-              <ul className="flex flex-col">
-                {view?.folders.map(({ folder, items }) => {
-                  const open = openIds.has(folder.id);
-                  return (
-                    <li key={folder.id}>
-                      <button
-                        type="button"
-                        onClick={() => toggle(folder.id)}
-                        aria-expanded={open}
-                        className="flex w-full min-w-0 items-center gap-[0.3125rem] px-[0.625rem] py-[0.3125rem] text-left hover:bg-[var(--to-surface-2)]"
-                      >
-                        <ChevronRight
-                          aria-hidden
-                          className={`size-3.5 shrink-0 text-ink-3 transition-transform ${
-                            open ? "rotate-90" : ""
-                          }`}
-                        />
-                        <FolderClosed aria-hidden className="size-4 shrink-0 text-ink-3" />
-                        <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-ink-2">
-                          {folder.name}
-                        </span>
-                        <span className="shrink-0 text-[0.6875rem] tabular-nums text-ink-3">
-                          {items.length}
-                        </span>
-                      </button>
-
-                      {open && (
-                        <ul className="ml-[1.125rem] border-l border-[var(--to-border)] pl-[0.25rem]">
-                          {items.length === 0 && (
-                            <li className="px-[0.5rem] py-[0.1875rem] text-[0.75rem] text-ink-3">
-                              Empty
-                            </li>
-                          )}
-                          {items.map((item) => (
-                            <li key={item.id} className="group/row">
-                              <FileRow
-                                title={item.title}
-                                onOpen={
-                                  item.analysisId
-                                    ? () => onOpenResource(item.analysisId!)
-                                    : undefined
-                                }
-                                onOut={() => onFileChanged(item.id, null)}
-                              />
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </li>
-                  );
-                })}
-
-                {view?.root.map((item) => {
-                  const analysisId = item.analysisId;
-                  return (
-                    <li key={item.id} className="group/row">
-                      <FileRow
-                        title={item.title}
-                        onOpen={analysisId ? () => onOpenResource(analysisId) : undefined}
-                        folders={view.folders.map((f) => ({ id: f.folder.id, name: f.folder.name }))}
-                        onFileInto={(folderId) => onFileChanged(item.id, folderId)}
+            <ul className="flex flex-col">
+              {view?.folders.map(({ folder, items }) => {
+                const open = openIds.has(folder.id);
+                return (
+                  <li key={folder.id}>
+                    <button
+                      type="button"
+                      onClick={() => toggle(folder.id)}
+                      aria-expanded={open}
+                      className="flex w-full min-w-0 items-center gap-[0.3125rem] px-[0.625rem] py-[0.3125rem] text-left hover:bg-[var(--to-surface-2)]"
+                    >
+                      <ChevronRight
+                        aria-hidden
+                        className={`size-3.5 shrink-0 text-ink-3 transition-transform ${
+                          open ? "rotate-90" : ""
+                        }`}
                       />
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          </>
-        ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <button
-              type="button"
-              onClick={onTidy}
-              disabled={tidyBusy || empty}
-              aria-label="Ask the model to tidy the files"
-              className={`${FULL_ROW} disabled:opacity-50 disabled:hover:bg-[var(--to-surface)]`}
-            >
-              {tidyBusy ? (
-                <Loader2 aria-hidden className="size-4 shrink-0 animate-spin text-ink-3" />
-              ) : (
-                <Sparkles aria-hidden className="size-4 shrink-0 text-ink-3" />
-              )}
-              {tidyBusy ? "Tidying…" : "Tidy the files"}
-              <ChevronRight aria-hidden className="ml-auto size-4 shrink-0 text-ink-3" />
-            </button>
+                      <FolderClosed aria-hidden className="size-4 shrink-0 text-ink-3" />
+                      <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-ink-2">
+                        {folder.name}
+                      </span>
+                      <span className="shrink-0 text-[0.6875rem] tabular-nums text-ink-3">
+                        {items.length}
+                      </span>
+                    </button>
 
-            <div className="flex flex-col gap-[0.4375rem] px-[0.625rem] py-[0.5rem]">
-              {!proposal && (
-                <p className="text-[0.8125rem] leading-[1.5] text-ink-3">
-                  Nothing proposed yet. Tidying asks the model to group what you have — it can
-                  suggest a change, it cannot delete one.
-                </p>
-              )}
-
-              {proposal && (
-                <>
-                  <p className="text-[0.75rem] text-ink-3">
-                    {pending.length > 0
-                      ? `${pending.length} deletion${pending.length === 1 ? "" : "s"} waiting for you`
-                      : applied.length > 0
-                        ? `${applied.length} change${applied.length === 1 ? "" : "s"} applied`
-                        : "Nothing was changed"}
-                  </p>
-
-                  {applied.length > 0 && (
-                    <ul className="flex flex-col gap-[0.1875rem]">
-                      {applied.map((verdict, index) => (
-                        <li
-                          key={index}
-                          className="flex items-start gap-[0.3125rem] text-[0.75rem] leading-[1.5] text-ink-3"
-                        >
-                          <span aria-hidden className="mt-[0.0625rem] shrink-0 text-[var(--to-success)]">
-                            ✓
-                          </span>
-                          {verdict.summary}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {pending.length > 0 && (
-                    <ul className="flex flex-col gap-[0.4375rem] border-t border-[var(--to-border)] pt-[0.4375rem]">
-                      {pending.map((verdict, index) => (
-                        <li key={index} className="flex flex-col gap-[0.25rem]">
-                          <span className="text-[0.75rem] leading-[1.5] text-ink-2">
-                            {verdict.summary}
-                            {verdict.action.reason && (
-                              <span className="block text-[0.6875rem] text-ink-3">
-                                “{verdict.action.reason}”
-                              </span>
-                            )}
-                          </span>
-                          <span className="flex items-center gap-[0.375rem]">
-                            <DeleteButton
-                              tile={26}
-                              className="rounded-[0.375rem]"
-                              onConfirm={() => onApprove(verdict)}
-                              onCancel={() => onReject(verdict)}
+                    {open && (
+                      <ul className="ml-[1.125rem] border-l border-[var(--to-border)] pl-[0.25rem]">
+                        {items.length === 0 && (
+                          <li className="px-[0.5rem] py-[0.1875rem] text-[0.75rem] text-ink-3">
+                            Empty
+                          </li>
+                        )}
+                        {items.map((item) => (
+                          <li key={item.id} className="group/row">
+                            <FileRow
+                              title={item.title}
+                              onOpen={
+                                item.analysisId ? () => onOpenResource(item.analysisId!) : undefined
+                              }
+                              onOut={() => onFileChanged(item.id, null)}
                             />
-                            <span className="text-[0.6875rem] text-ink-3">delete, or keep it</span>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
 
-                  {proposal.note && (
-                    <p className="text-[0.6875rem] leading-[1.5] text-ink-3">{proposal.note}</p>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={onDismissProposal}
-                    className="self-start text-[0.6875rem] text-ink-3 underline-offset-2 hover:text-foreground hover:underline"
-                  >
-                    Dismiss
-                  </button>
-                </>
-              )}
-            </div>
+              {view?.root.map((item) => {
+                const analysisId = item.analysisId;
+                return (
+                  <li key={item.id} className="group/row">
+                    <FileRow
+                      title={item.title}
+                      onOpen={analysisId ? () => onOpenResource(analysisId) : undefined}
+                      folders={view.folders.map((f) => ({ id: f.folder.id, name: f.folder.name }))}
+                      onFileInto={(folderId) => onFileChanged(item.id, folderId)}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
           </div>
-        )}
-      </section>
-    </div>
+        </>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <button
+            type="button"
+            onClick={onTidy}
+            disabled={tidyBusy || empty}
+            aria-label="Ask the model to tidy the files"
+            className={`${FULL_ROW} disabled:opacity-50 disabled:hover:bg-[var(--to-surface)]`}
+          >
+            {tidyBusy ? (
+              <Loader2 aria-hidden className="size-4 shrink-0 animate-spin text-ink-3" />
+            ) : (
+              <Sparkles aria-hidden className="size-4 shrink-0 text-ink-3" />
+            )}
+            {tidyBusy ? "Tidying…" : "Tidy the files"}
+            <ChevronRight aria-hidden className="ml-auto size-4 shrink-0 text-ink-3" />
+          </button>
+
+          <div className="flex flex-col gap-[0.4375rem] px-[0.625rem] py-[0.5rem]">
+            {!proposal && (
+              <p className="text-[0.8125rem] leading-[1.5] text-ink-3">
+                Nothing proposed yet. Tidying asks the model to group what you have — it can
+                suggest a change, it cannot delete one.
+              </p>
+            )}
+
+            {proposal && (
+              <>
+                <p className="text-[0.75rem] text-ink-3">
+                  {pending.length > 0
+                    ? `${pending.length} deletion${pending.length === 1 ? "" : "s"} waiting for you`
+                    : applied.length > 0
+                      ? `${applied.length} change${applied.length === 1 ? "" : "s"} applied`
+                      : "Nothing was changed"}
+                </p>
+
+                {applied.length > 0 && (
+                  <ul className="flex flex-col gap-[0.1875rem]">
+                    {applied.map((verdict, index) => (
+                      <li
+                        key={index}
+                        className="flex items-start gap-[0.3125rem] text-[0.75rem] leading-[1.5] text-ink-3"
+                      >
+                        <span aria-hidden className="mt-[0.0625rem] shrink-0 text-[var(--to-success)]">
+                          ✓
+                        </span>
+                        {verdict.summary}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {pending.length > 0 && (
+                  <ul className="flex flex-col gap-[0.4375rem] border-t border-[var(--to-border)] pt-[0.4375rem]">
+                    {pending.map((verdict, index) => (
+                      <li key={index} className="flex flex-col gap-[0.25rem]">
+                        <span className="text-[0.75rem] leading-[1.5] text-ink-2">
+                          {verdict.summary}
+                          {verdict.action.reason && (
+                            <span className="block text-[0.6875rem] text-ink-3">
+                              “{verdict.action.reason}”
+                            </span>
+                          )}
+                        </span>
+                        <span className="flex items-center gap-[0.375rem]">
+                          <DeleteButton
+                            tile={26}
+                            className="rounded-[0.375rem]"
+                            onConfirm={() => onApprove(verdict)}
+                            onCancel={() => onReject(verdict)}
+                          />
+                          <span className="text-[0.6875rem] text-ink-3">delete, or keep it</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {proposal.note && (
+                  <p className="text-[0.6875rem] leading-[1.5] text-ink-3">{proposal.note}</p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={onDismissProposal}
+                  className="self-start text-[0.6875rem] text-ink-3 underline-offset-2 hover:text-foreground hover:underline"
+                >
+                  Dismiss
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * What the run is doing right now, as its own card above the files.
+ *
+ * It is not part of the file list: a stage in progress is not a document, and
+ * folding it into the same border made it look like one. It also only exists
+ * while a run does, which is a good reason for it to have its own border that
+ * can appear and disappear without moving anything else.
+ */
+export function StageCard({ stage, mode }: { stage: string; mode: "demo" | "live" | null }) {
+  return (
+    <Card>
+      <div className="px-[0.5rem] py-[0.3125rem]">
+        <StageLine stage={stage} mode={mode} />
+      </div>
+    </Card>
+  );
+}
+
+function StageLine({ stage, mode }: { stage: string; mode: "demo" | "live" | null }) {
+  return (
+    <span className="flex h-6 items-center gap-[0.375rem] text-[0.8125rem] text-ink-2">
+      <span
+        aria-hidden
+        className="size-[0.4375rem] shrink-0 animate-pulse rounded-full bg-[var(--to-accent)]"
+      />
+      <span className="min-w-0 truncate">{stage}</span>
+      {mode === "demo" && <span className="shrink-0 text-[0.6875rem] text-ink-3">demo</span>}
+    </span>
   );
 }
 

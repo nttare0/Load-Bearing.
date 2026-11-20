@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Brain, Check, ChevronRight, ExternalLink, Eye, EyeOff, Loader2, Trash2, X } from "lucide-react";
+import { useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Brain, Check, ChevronRight, ExternalLink, Eye, EyeOff, Loader2, Trash2 } from "lucide-react";
 import { ConnectorList, useConnectors } from "@/components/Connectors";
 import { EFFORTS, THINKING, type Effort } from "@/lib/effort";
 import {
@@ -15,9 +16,17 @@ import {
 } from "@/lib/byok";
 
 /**
- * Settings, as a sheet over the right rail.
+ * Settings, as a page.
  *
- * Two cards, in the order the questions arrive:
+ * It used to be a sheet laid over the right rail — `absolute inset-0` inside a
+ * 240px column — which is a strange thing for the one screen that holds every
+ * preference in the app: it could only ever be as wide as the panel it covered,
+ * and it made "settings" feel like a drawer in a drawer.
+ *
+ * It is a route now (`/settings`), with the same three cards, and a page-width
+ * measure so a key field can be read without scrolling sideways.
+ *
+ * Three cards, in the order the questions arrive:
  *
  * 1. **Your model** — whose key this runs on. The deployment's key is on a free
  *    tier of twenty requests a day, which the five passes spend in about four
@@ -29,6 +38,8 @@ import {
  *    hosts this, where the code lives, which model answers, and where your work
  *    is kept. Not decoration: each one links to the thing it names.
  *
+ * and, first, **Thinking**, which lives here and nowhere else.
+ *
  * A key never appears in full after it is saved, is never in a URL, and is never
  * sent anywhere but the deployment itself.
  */
@@ -38,7 +49,7 @@ const HEAD_ROW = "flex h-[1.875rem] items-center gap-[0.25rem] px-[0.625rem]";
 
 type TestResult = { ok: boolean; line: string; detail?: string };
 
-export function SettingsPanel({
+export function SettingsPage({
   settings,
   onChange,
   mode,
@@ -46,7 +57,6 @@ export function SettingsPanel({
   storage,
   thinking,
   onThinking,
-  onClose,
 }: {
   settings: LlmSettings;
   onChange: (settings: LlmSettings) => void;
@@ -56,22 +66,12 @@ export function SettingsPanel({
   /** How hard the model is asked to think on the next run. */
   thinking: Effort;
   onThinking: (effort: Effort) => void;
-  onClose: () => void;
 }) {
   const [draft, setDraft] = useState(settings);
   const [reveal, setReveal] = useState(false);
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
   const [saved, setSaved] = useState(false);
-
-  // Escape closes the sheet, the way every other sheet does.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   const checked = checkKey(draft);
   const dirty = draft.key !== settings.key || draft.provider !== settings.provider || draft.remember !== settings.remember;
@@ -133,25 +133,21 @@ export function SettingsPanel({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Settings"
-      className="absolute inset-0 z-30 flex flex-col overflow-y-auto bg-[var(--to-bg)]"
-    >
-      <div className="sticky top-0 z-10 flex h-[2.125rem] shrink-0 items-center gap-[0.25rem] border-b border-[var(--to-border)] bg-[var(--to-bg)]/95 px-[0.5rem] backdrop-blur-sm">
-        <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-ink-2">Settings</span>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close settings"
-          className="shrink-0 rounded-[0.25rem] p-[0.125rem] text-ink-3 hover:bg-[var(--to-surface-2)] hover:text-foreground"
-        >
-          <X aria-hidden className="size-4" />
-        </button>
-      </div>
+    <div className="mx-auto flex w-full max-w-[34rem] flex-col px-[1rem] pb-[2rem] pt-[1rem]">
+      <Link
+        href="/"
+        className="mb-[0.5rem] flex w-fit items-center gap-[0.25rem] text-[0.75rem] text-ink-3 hover:text-foreground"
+      >
+        <ArrowLeft aria-hidden className="size-3.5" />
+        Back to the workspace
+      </Link>
 
-      <div className="flex flex-col gap-[0.5rem] px-[0.5rem] py-[0.5rem]">
+      <header className="mb-[0.75rem] flex flex-col gap-[0.125rem]">
+        <h1 className="text-[1.0625rem] font-medium text-foreground">Settings</h1>
+        <p className="text-[0.75rem] text-ink-3">Kept in this browser, except the keys you paste.</p>
+      </header>
+
+      <div className="flex flex-col gap-[0.5rem]">
         {/* ---- how hard it thinks ---------------------------------------- */}
         <section className={CARD}>
           <div className={HEAD_ROW}>

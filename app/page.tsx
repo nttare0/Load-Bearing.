@@ -12,7 +12,8 @@ import { assignKeys } from "@/lib/diff";
 import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
 import { NavRail } from "@/components/NavRail";
-import { SettingsPanel } from "@/components/SettingsPanel";
+import { StageCard } from "@/components/rail/FileRail";
+import { Panel } from "@/components/rail/panels";
 import { WorkspaceRail } from "@/components/rail/WorkspaceRail";
 import { FileRail } from "@/components/rail/FileRail";
 import { ConnectorRail } from "@/components/rail/ConnectorRail";
@@ -101,8 +102,6 @@ export default function Home() {
    */
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
-  /** Which content the right column shows when settings is asked for. */
-  const [face, setFace] = useState<"connectors" | "settings">("connectors");
   const [thinking, setThinking] = useState<Effort>(DEFAULT_EFFORT);
   /** The top bar's idea of "the panel", which is the right column. */
   const railOpen = rightOpen;
@@ -530,7 +529,6 @@ export default function Home() {
     setProposal(null);
     // A new chat is a new thread: show where it lands, and make sure the
     // column that holds its files is not folded away.
-    setFace("connectors");
     setRightOpen(true);
   }, [persist, workspaces]);
 
@@ -726,19 +724,17 @@ export default function Home() {
       <NavRail
         workspacesOpen={leftOpen}
         filesOpen={rightOpen}
-        settingsOpen={face === "settings"}
+        settingsOpen={false}
         onNewChat={create}
         onWorkspaces={() => {
           setLeftOpen((prev) => !prev);
-          setFace("connectors");
         }}
         onFiles={() => {
           setRightOpen((prev) => !prev);
-          setFace(face === "settings" ? "connectors" : face);
         }}
         onSettings={() => {
-          setRightOpen(true);
-          setFace(face === "settings" ? "connectors" : "settings");
+          // A page, not a panel: the whole point of moving it out of the rail.
+          window.location.href = "/settings";
         }}
         onCollapse={collapseAll}
       />
@@ -751,11 +747,7 @@ export default function Home() {
             : "pointer-events-none w-0 border-transparent opacity-0"
         }`}
       >
-        <aside
-          aria-label="Chats"
-          aria-hidden={!leftOpen}
-          className="flex w-[15rem] shrink-0 flex-col px-[0.5rem] py-[0.5rem]"
-        >
+        <Panel label="Chats" className="w-[15rem]">
           <WorkspaceRail
             workspaces={workspaces.map((w) => ({
               workspace: w,
@@ -767,7 +759,7 @@ export default function Home() {
             onCreate={create}
             onDelete={remove}
           />
-        </aside>
+        </Panel>
       </div>
 
       {/* ---- the thread --------------------------------------------------- */}
@@ -831,7 +823,7 @@ export default function Home() {
         </main>
       </div>
 
-      {/* ---- right panel: files and activity, then connectors -------------- */}
+      {/* ---- right panel: each card its own, no wrapper ------------------- */}
       <div
         className={`relative hidden shrink-0 overflow-hidden border-l transition-[width,opacity,border-color] duration-200 ease-out md:flex ${
           rightOpen
@@ -839,17 +831,14 @@ export default function Home() {
             : "pointer-events-none w-0 border-transparent opacity-0"
         }`}
       >
-        <aside
-          aria-label={face === "settings" ? "Settings" : "Files, activity and connectors"}
-          aria-hidden={!rightOpen}
-          className="relative flex w-[15rem] shrink-0 flex-col gap-[0.5rem] px-[0.5rem] py-[0.5rem]"
-        >
+        <Panel label="Files, activity and connectors" className="w-[15rem]">
+          {/* What the run is doing, its own card, only while it is doing it. */}
+          {stage && <StageCard stage={stage} mode={mode} />}
+
           <FileRail
             workspace={current}
             proposal={proposal}
             tidyBusy={tidyBusy}
-            stage={busy ? stage ?? null : null}
-            mode={mode}
             onTidy={() => void tidy()}
             onApprove={approveDeletion}
             onReject={(verdict) =>
@@ -870,7 +859,6 @@ export default function Home() {
             model={tools.model}
             storage={tools.storage}
             llmKey={Boolean(llm.key.trim())}
-            onOpenSettings={() => setFace("settings")}
           />
 
           {/* Rare UI's licence asks for a visible credit wherever its components
@@ -886,23 +874,7 @@ export default function Home() {
               Rare UI
             </a>
           </p>
-
-          {/* Settings is a sheet over this column, not a third panel: it is a
-              place you visit and leave, and its controls refer to everything
-              behind it. */}
-          {face === "settings" && (
-            <SettingsPanel
-              settings={llm}
-              onChange={saveLlm}
-              mode={mode}
-              model={tools.model}
-              storage={tools.storage}
-              thinking={thinking}
-              onThinking={chooseThinking}
-              onClose={() => setFace("connectors")}
-            />
-          )}
-        </aside>
+        </Panel>
       </div>
     </div>
   );
