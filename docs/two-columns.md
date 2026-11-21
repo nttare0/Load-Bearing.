@@ -14,11 +14,19 @@ sentence instead of a tooltip. Files and activity described a workspace, but the
 workspace is already the chat you are looking at — the thread *is* the record of
 what happened in it.
 
-So: the cards are deleted, not hidden. `FileRail.tsx` and `ConnectorRail.tsx` are
-gone from the tree, along with the tilting machinery in `app/page.tsx` that only
-existed to feed them. Connectors still appear, in Settings. Folders still exist on
-the workspace and still export with it; nothing browses them now, and the code
-that only drove the browser went with it rather than sitting unused.
+So the third column and the wiring that fed it are gone from the page: the
+components are no longer mounted, and `app/page.tsx` no longer holds the state
+they needed (`proposal`, `tidyBusy`, `tidy`, `approveDeletion`, `addFolder`,
+`moveResource`, `deleteResource`, `rightOpen`, `toggleRail`, `collapseAll`).
+
+**The components themselves are still in the tree** — `components/rail/FileRail.tsx`
+and `components/rail/ConnectorRail.tsx` are untouched and still compile. Removing a
+section from a layout is not the same decision as deleting the component, and only
+the first was asked for. If a files browser or a connector strip comes back, it
+comes back from files that were never rewritten.
+
+Connectors still appear, in Settings, via `ConnectorList`. Folders and resources
+still exist on every workspace and still export with it.
 
 ## The layout
 
