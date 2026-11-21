@@ -33,7 +33,7 @@ export default function Privacy() {
           body: [
             "Your chats, the plans you paste, the reports generated from them, and any folders you make are kept in this browser's local storage under keys beginning with `load-bearing:`. They are not uploaded unless you explicitly choose to keep a report in the cloud, which only happens on a deployment with Supabase configured.",
             "If you paste your own model key in Settings, it is stored the same way — in this browser only — unless you turn off \"remember on this device\", in which case it lives in the tab and is gone when you close it. Keys are never written into a report, a share link, or the server.",
-            "Clearing your browser's site data for this domain deletes all of it. There is no copy anywhere else.",
+            "Settings → Delete your data removes every one of those keys in one action, and says how much is stored before you do it. Clearing your browser's site data for this domain does the same thing. There is no copy anywhere else.",
           ],
         },
         {

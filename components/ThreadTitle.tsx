@@ -30,6 +30,8 @@ export function ThreadTitle({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
+  /** Which row is asking "really?" — a delete from a menu used to be instant. */
+  const [confirming, setConfirming] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -133,11 +135,23 @@ export function ThreadTitle({
                   {workspaces.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => onDelete(workspace.id)}
-                      aria-label={`Delete ${workspace.name}`}
-                      className="mr-[0.375rem] rounded-[var(--to-radius-sm)] p-[0.1875rem] text-ink-3 opacity-0 hover:text-[var(--to-danger)] focus-visible:opacity-100 group-hover/row:opacity-100"
+                      onClick={() =>
+                        // Two steps, in place: opening a dialog for this would be
+                        // heavier than the thing being deleted.
+                        confirming === workspace.id ? onDelete(workspace.id) : setConfirming(workspace.id)
+                      }
+                      aria-label={
+                        confirming === workspace.id
+                          ? `Confirm deleting ${workspace.name}`
+                          : `Delete ${workspace.name}`
+                      }
+                      className="mr-[0.375rem] rounded-[var(--to-radius-sm)] p-[0.1875rem] text-ink-3/60 hover:bg-[var(--to-surface-2)] hover:text-[var(--to-danger)] focus-visible:text-[var(--to-danger)]"
                     >
-                      <Trash2 aria-hidden className="size-3" />
+                      {confirming === workspace.id ? (
+                        <span className="text-[0.625rem] text-[var(--to-danger)]">sure?</span>
+                      ) : (
+                        <Trash2 aria-hidden className="size-3" />
+                      )}
                     </button>
                   )}
                 </li>

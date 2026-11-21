@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Download, FileJson, FileText, Link as LinkIcon, RotateCw, Share2, Trash2 } from "lucide-react";
+import { Download, FileJson, FileText, Link as LinkIcon, RotateCw, Share2 } from "lucide-react";
+import { DeleteButton } from "@/components/rare/delete-button";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -166,10 +167,17 @@ export function Report({
                   Run again
                 </Button>
               )}
+              {/* Deleting used to be an unlabelled bin icon in a row of outline
+                  buttons — the smallest, least visible thing in the header, for
+                  the only irreversible action on the page. It is now a named
+                  control that asks first. */}
               {onDelete && (
-                <Button variant="ghost" size="sm" onClick={onDelete} aria-label="Delete this analysis">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <DeleteButton
+                  tile={26}
+                  className="rounded-[0.375rem]"
+                  onConfirm={onDelete}
+                  onCancel={() => undefined}
+                />
               )}
             </div>
           </div>

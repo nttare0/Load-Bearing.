@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Brain, ChevronDown, FileUp, FlaskConical, Loader2, Paperclip, Search, ShieldCheck } from "lucide-react";
+import { Brain, FileUp, Loader2, Paperclip, ShieldCheck, Sparkles } from "lucide-react";
 import { PromptBox, type PromptEffort } from "@/components/rare/prompt-box";
 import { Button } from "@/components/ui/button";
 import { THINKING, type Effort } from "@/lib/effort";
@@ -14,12 +14,17 @@ import { THINKING, type Effort } from "@/lib/effort";
  * level. The level is not decoration: it is sent with the plan and sets how hard
  * the model thinks, so holding longer buys more reasoning.
  *
+ * **One box, one action.** There used to be an Ask/Agent toggle beside the send
+ * button, which asked the person to classify their own message before the app
+ * would route it. That is the app's job. `/api/intent` labels the message and the
+ * caller dispatches — see `submit` below. The toggle is gone rather than
+ * defaulted, because a control whose only correct setting is "whatever you were
+ * about to type" is noise.
+ *
  * The strip under the box is where this app differs. It names the workspace the
  * work lands in, how many reports are already there, and whether the run is live
  * or demo — state you can read without opening anything.
  */
-
-export type ComposerMode = "analyze" | "ask";
 
 /** The three levels the hold climbs through. Colour is only a hint; the id is
  *  what the pipeline actually receives. */
@@ -30,8 +35,7 @@ const EFFORTS: PromptEffort[] = [
 ];
 
 export function Composer({
-  onAnalyze,
-  onAsk,
+  onSend,
   busy,
   aiMode,
   workspaceName,
@@ -43,8 +47,11 @@ export function Composer({
   thinking,
   onThinking,
 }: {
-  onAnalyze: (text: string, keep: boolean, effort?: string) => void;
-  onAsk: (question: string) => void;
+  /**
+   * Hand the message over. The page asks `/api/intent` and dispatches to the
+   * pipeline or the research route; the composer does not care which.
+   */
+  onSend: (text: string, keep: boolean, effort?: string) => void | Promise<void>;
   busy: boolean;
   aiMode: "demo" | "live" | null;
   workspaceName: string;
@@ -65,20 +72,11 @@ export function Composer({
   useEffect(() => {
     if (draft) setText(draft);
   }, [draft]);
-  const [override, setOverride] = useState<ComposerMode | null>(null);
   const [uploading, setUploading] = useState(false);
   const [attached, setAttached] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const trimmed = text.trim();
-  // A short message that asks something is a question; anything else is a plan.
-  const guessed: ComposerMode =
-    trimmed.length < 400 &&
-    (/\?\s*$/.test(trimmed) ||
-      /^(what|why|how|which|should|is|are|can|could|do|does|who)\b/i.test(trimmed))
-      ? "ask"
-      : "analyze";
-  const mode = override ?? guessed;
 
   const onFile = async (file: File) => {
     setUploading(true);
@@ -117,10 +115,10 @@ export function Composer({
         onValueChange={setText}
         status={busy ? "streaming" : "idle"}
         onSubmit={(prompt, effort) => {
-          if (mode === "ask") onAsk(prompt);
-          else onAnalyze(prompt, keep, effort.id);
+          // No dispatch here: the page asks the classifier and routes. The
+          // composer's job ends at handing over the text and the level.
+          void onSend(prompt, keep, effort.id);
           setAttached(null);
-          setOverride(null);
         }}
         onStop={() => {
           // The run keeps going to the end: half an analysis would be a claim
@@ -130,16 +128,12 @@ export function Composer({
         }}
         efforts={EFFORTS}
         startingLevel={Math.max(0, EFFORTS.findIndex((item) => item.id === thinking))}
-        placeholder={
-          mode === "ask"
-            ? ["Ask about this workspace…", "What did the last run get wrong?"]
-            : [
-                "Paste a plan, a decision, or an argument…",
-                "We will open three cafés in Kigali by June…",
-                "One rider, 40 orders a day, 12,000 RWF a meal…",
-              ]
-        }
-        hint={mode === "ask" ? undefined : "Hold to think harder"}
+        placeholder={[
+          "Paste a plan, or ask about the one you pasted…",
+          "We will open three cafés in Kigali by June…",
+          "Which claim would cost the most to be wrong?",
+        ]}
+        hint="Hold to think harder"
         className="w-full rounded-[var(--to-radius)] border-[var(--to-border)] bg-[var(--to-surface)] text-foreground dark:text-foreground"
         actions={
           <>
@@ -165,17 +159,19 @@ export function Composer({
               </span>
             )}
 
-            {/* The mode is a control, not just a label: clicking it flips a
-                question into a plan, or the other way round. */}
-            <button
-              type="button"
-              onClick={() => setOverride(mode === "ask" ? "analyze" : "ask")}
-              className="flex shrink-0 items-center gap-[0.3125rem] rounded-[var(--to-radius-sm)] px-[0.375rem] py-[0.25rem] text-[0.75rem] text-ink-2 hover:bg-[var(--to-surface-2)]"
+            {/* Not a control: a statement about what the app will do, which is
+                the only thing the old toggle was ever really telling you. */}
+            <span
+              className="flex shrink-0 items-center gap-[0.3125rem] px-[0.25rem] text-[0.6875rem] text-ink-3"
+              title="A plan gets analysed; a question gets answered from the reports in this chat."
             >
-              {mode === "ask" ? <Search className="size-3.5" /> : <FlaskConical className="size-3.5" />}
-              {mode === "ask" ? "Ask" : "Agent"}
-              <ChevronDown className="size-3" />
-            </button>
+              <Sparkles className="size-3" aria-hidden />
+              {trimmed.length === 0
+                ? "plan or question"
+                : trimmed.length > 0 && /\?\s*$/.test(trimmed)
+                  ? "a question"
+                  : "a plan"}
+            </span>
           </>
         }
       />

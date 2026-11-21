@@ -76,6 +76,13 @@ export function SettingsScreen() {
         storage={storage}
         thinking={thinking}
         onThinking={chooseThinking}
+        onErased={() => {
+          // Everything local is gone, including the workspace list this page
+          // reads on mount. A hard navigation is the honest reset: it remounts
+          // the workspace with its first-run state rather than leaving this tab
+          // holding objects whose storage no longer exists.
+          window.location.href = "/";
+        }}
       />
     </main>
   );

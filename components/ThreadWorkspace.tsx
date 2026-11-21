@@ -5,7 +5,6 @@ import { Loader2 } from "lucide-react";
 import { Thread } from "@/components/Thread";
 import { ReasoningPanel } from "@/components/ReasoningPanel";
 import type { ReasonStep } from "@/lib/reasoning";
-import { StatusLegend } from "@/components/Report";
 import { EXAMPLES } from "@/lib/examples";
 import type { Analysis } from "@/lib/schema";
 import type { Workspace } from "@/lib/workspace";
@@ -91,16 +90,13 @@ export function ThreadWorkspace({
           <h1 className="lb-serif text-center text-[2rem] leading-[1.1] tracking-[-0.01em] text-ink sm:text-[2.5rem]">
             What would you like to test?
           </h1>
-          <p className="mx-auto max-w-[34rem] text-center text-[0.875rem] leading-[1.55] text-ink-3">
-            Paste a plan — a business, a launch, a hire, a trip. You get back the assumptions it
-            quietly rests on, ranked by what breaks if they are wrong, each with the cheapest test
-            that could settle it.
-          </p>
-          {/* Where it will go, said before it goes there: the one thing a new
-              chat cannot show you is the list it will join. */}
-          <p className="mx-auto max-w-[34rem] text-center text-[0.75rem] leading-[1.5] text-ink-3">
-            Sending starts this chat and names it after the plan. Until then nothing is saved,
-            and asking for a new chat leaves this one blank.
+          {/* One sentence. It used to be two paragraphs plus a badge legend plus
+              a note on how naming works — all of it explaining the empty state
+              instead of leaving room for the thing you came to paste. The
+              placeholder in the box already says what to do. */}
+          <p className="mx-auto max-w-[30rem] text-center text-[0.875rem] leading-[1.55] text-ink-3">
+            Paste a plan and get back the assumptions it rests on, ranked by what breaks if they
+            are wrong.
           </p>
         </div>
 
@@ -128,9 +124,6 @@ export function ThreadWorkspace({
           </div>
         )}
 
-        <div className="mx-auto flex w-full max-w-[42rem] flex-col items-center gap-[0.75rem]">
-          <StatusLegend />
-        </div>
       </div>
     );
   }
