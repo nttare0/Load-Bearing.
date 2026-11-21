@@ -208,6 +208,8 @@ export function SettingsPage({
               >
                 <input
                   id="api-key"
+                  aria-invalid={keyBroken || undefined}
+                  aria-describedby={keyBroken ? "api-key-error" : undefined}
                   type={reveal ? "text" : "password"}
                   value={draft.key}
                   onChange={(event) => {
@@ -233,7 +235,11 @@ export function SettingsPage({
 
               {/* A wrong key is a warning, not a red field border alone. */}
               {keyBroken && (
-                <p className="flex items-start gap-[0.3125rem] text-[0.75rem] leading-[1.5] text-[var(--to-danger)]">
+                <p
+                  id="api-key-error"
+                  role="alert"
+                  className="flex items-start gap-[0.3125rem] text-[0.75rem] leading-[1.5] text-[var(--to-danger)]"
+                >
                   <TriangleAlert aria-hidden className="mt-[0.125rem] size-3.5 shrink-0" />
                   {checked.ok ? null : checked.reason}
                 </p>

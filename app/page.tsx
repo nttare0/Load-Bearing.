@@ -12,6 +12,8 @@ import type { ReasonStep } from "@/lib/reasoning";
 import { planForRun, previousRun, readPlans, recordRun, writePlans, type Plan } from "@/lib/plans";
 import { ThreadWorkspace } from "@/components/ThreadWorkspace";
 import { NavRail } from "@/components/NavRail";
+import { SiteFooter } from "@/components/SiteFooter";
+import { MobileBar } from "@/components/MobileBar";
 import { Panel } from "@/components/rail/panels";
 import { WorkspaceRail } from "@/components/rail/WorkspaceRail";
 import { DEFAULT_EFFORT, type Effort } from "@/lib/effort";
@@ -749,7 +751,7 @@ export default function Home() {
         <main
           className={`mx-auto flex w-full max-w-[46rem] flex-1 flex-col px-[1rem] ${
             threaded ? "pt-[1.25rem]" : "pt-[3.75rem]"
-          } pb-[1.5rem]`}
+          } pb-[4.5rem] md:pb-[1.5rem]`}
         >
           <ThreadWorkspace
             workspace={current}
@@ -771,20 +773,23 @@ export default function Home() {
         </main>
       </div>
 
-      {/* Rare UI's licence asks for a visible credit wherever its components
-          ship. It lived in the right column; the column is gone, so the credit
-          moves to the one place that is always on screen. */}
-      <p className="pointer-events-none fixed bottom-[0.25rem] right-[0.5rem] z-10 text-[0.625rem] leading-[1.4] text-ink-3">
-        Components from{" "}
-        <a
-          href="https://www.rareui.com"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="pointer-events-auto underline underline-offset-2 hover:text-foreground"
-        >
-          Rare UI
-        </a>
-      </p>
+      {/* Below 768px the sidebar is hidden, so these three destinations move to
+          the bottom of the screen instead of disappearing entirely. */}
+      <MobileBar
+        onNewChat={create}
+        onChats={toggleChats}
+        onSettings={() => {
+          window.location.href = "/settings";
+        }}
+      />
+
+      {/* Both legal pages have to be reachable from the workspace, and Rare UI's
+          licence asks for a visible credit wherever its components ship. One
+          fixed line does all three, out of the way of the composer. */}
+      {/* Clears the mobile bar, which is 3rem plus the safe-area inset. */}
+      <div className="pointer-events-none fixed bottom-[calc(3.25rem+env(safe-area-inset-bottom))] right-[0.5rem] z-10 md:bottom-[0.25rem]">
+        <SiteFooter className="pointer-events-auto" />
+      </div>
     </div>
   );
 }

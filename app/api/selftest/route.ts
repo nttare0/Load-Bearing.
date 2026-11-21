@@ -6,6 +6,8 @@ import type { Analysis, PipelineEvent } from "@/lib/schema";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+// Nothing here may be cached: both routes spend model calls and one carries a token.
+export const dynamic = "force-dynamic";
 
 /**
  * Runs the whole five-pass pipeline on a fixed sample and reports what came

@@ -13,3 +13,10 @@ yarn-error.log*
 .vercel
 next-env.d.ts
 *.tsbuildinfo
+
+# Agent skill bundles installed by `npx skills add` (~500KB of markdown per
+# vendor directory). These are tooling, not project source: they are installed
+# per-machine and would otherwise dominate every diff.
+agent/
+.agents/
+.claude/

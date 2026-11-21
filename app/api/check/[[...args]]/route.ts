@@ -27,6 +27,8 @@ import type { PipelineEvent } from "@/lib/schema";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+// A token-bearing route must never be cached by a CDN or stored by a crawler.
+export const dynamic = "force-dynamic";
 
 const SAMPLE = `We are launching a subscription meal-prep service for remote workers in Kigali.
 
