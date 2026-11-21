@@ -163,7 +163,10 @@ export function ThreadWorkspace({
       {/* Pinned to the bottom of the column. It used to sit after the whole
           report, four screens down, so answering anything meant scrolling to
           find the box you type in. */}
-      <div className="sticky bottom-0 z-10 -mx-[1rem] bg-[var(--to-bg)]/92 px-[1rem] pt-[0.5rem] pb-[0.75rem] backdrop-blur-sm">
+      {/* Sits above the mobile bar rather than under it: the bar is 3rem plus the
+          safe-area inset, and a composer you cannot see is not a composer. On
+          md+ the inset is zero because the bar is not rendered. */}
+      <div className="sticky bottom-[calc(3rem+env(safe-area-inset-bottom))] z-10 -mx-[1rem] bg-[var(--to-bg)]/92 px-[1rem] pt-[0.5rem] pb-[0.75rem] backdrop-blur-sm md:bottom-0">
         <div className="mx-auto w-full max-w-[42rem]">{composer}</div>
       </div>
     </div>

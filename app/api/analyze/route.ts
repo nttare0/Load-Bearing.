@@ -5,6 +5,7 @@ import { saveAnalysis } from "@/lib/store";
 import { demoAnalysis } from "@/lib/demo";
 import { thinkingFor } from "@/lib/effort";
 import { credentialFrom, withVisitor } from "@/lib/visitor";
+import { callerKey, limitHeaders, take } from "@/lib/ratelimit";
 import type { Analysis, PipelineEvent } from "@/lib/schema";
 
 export const runtime = "nodejs";
@@ -40,6 +41,27 @@ export async function POST(request: Request) {
     return Response.json(
       { error: `That's ${text.length.toLocaleString()} characters. The limit is ${MAX_INPUT.toLocaleString()} — trim to the parts that carry weight.` },
       { status: 413 }
+    );
+  }
+
+  /*
+   * Five model passes per request, so this is the endpoint worth limiting.
+   *
+   * A visitor on their own key spends their own quota, so they get the wide
+   * limit; a visitor on the deployment's key shares one daily allowance, so they
+   * get a narrow one. Demo mode costs nothing and is exempt — there is no model
+   * call to protect and it is the path a first-time visitor sees.
+   */
+  const onOwnKey = credential !== null;
+  const verdict = take(callerKey(request), { limit: onOwnKey ? 60 : 12 });
+  if (!verdict.ok) {
+    return Response.json(
+      {
+        error: onOwnKey
+          ? `That is ${verdict.limit} runs in an hour on your own key. Try again in ${Math.ceil(verdict.retryAfter / 60)} minutes.`
+          : `This deployment runs on one shared model key, and the hourly allowance for this browser is used up. Add your own key in Settings, or try again in ${Math.ceil(verdict.retryAfter / 60)} minutes.`,
+      },
+      { status: 429, headers: limitHeaders(verdict) }
     );
   }
 

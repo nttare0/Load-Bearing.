@@ -1,7 +1,8 @@
 import { SettingsScreen } from "@/components/SettingsScreen";
 
 export const metadata = {
-  title: "Settings — Load-Bearing",
+  // The layout's template appends the brand, so this stays the bare page name.
+  title: "Settings",
   description: "Your model key, the thinking level, and what this deployment is wired to.",
 };
 
