@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -14,6 +14,8 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { ConnectorList, useConnectors } from "@/components/Connectors";
+import { DeleteButton } from "@/components/rare/delete-button";
+import { eraseLocal, formatBytes, localUsage } from "@/lib/erase";
 import { Card, CardTitle, Panel } from "@/components/rail/panels";
 import { EFFORTS, THINKING, type Effort } from "@/lib/effort";
 import {
@@ -58,6 +60,7 @@ export function SettingsPage({
   storage,
   thinking,
   onThinking,
+  onErased,
 }: {
   settings: LlmSettings;
   onChange: (settings: LlmSettings) => void;
@@ -66,12 +69,23 @@ export function SettingsPage({
   storage: string | null;
   thinking: Effort;
   onThinking: (effort: Effort) => void;
+  /** Called after everything local is gone, so the workspace can reset. */
+  onErased: () => void;
 }) {
   const [draft, setDraft] = useState(settings);
   const [reveal, setReveal] = useState(false);
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
   const [saved, setSaved] = useState(false);
+  /**
+   * What deleting would remove, counted before it is offered.
+   *
+   * Read in an effect rather than during render: this is a client component but
+   * it still renders on the server first, where `localStorage` does not exist.
+   */
+  const [usage, setUsage] = useState<{ keys: number; bytes: number } | null>(null);
+  const [erased, setErased] = useState<number | null>(null);
+  useEffect(() => setUsage(localUsage()), []);
 
   const checked = checkKey(draft);
   const dirty =
@@ -449,6 +463,50 @@ export function SettingsPage({
               ? "Supabase is on, so a report you choose to keep is stored on the server and reachable from another device."
               : "Supabase is off in this deployment, so nothing you paste leaves this browser — reports live here until you clear them."}
           </p>
+        </Card>
+
+        {/* ---- delete everything ------------------------------------------- */}
+        <Card>
+          <CardTitle title="Delete your data">
+            <span className="shrink-0 text-[0.6875rem] text-ink-3">
+              {usage ? `${usage.keys} keys · ${formatBytes(usage.bytes)}` : "…"}
+            </span>
+          </CardTitle>
+
+          <div className="flex flex-col gap-[0.5rem] border-t border-[var(--to-border)] px-[0.75rem] py-[0.625rem]">
+            <p className="text-[0.8125rem] leading-[1.55] text-ink-2">
+              Every chat, plan, report and pasted key, gone from this browser in one go. Chats can
+              be deleted one at a time from the list; this is for when you want all of it gone and
+              do not want to click eight times.
+            </p>
+            <p className="text-[0.75rem] leading-[1.55] text-ink-3">
+              {storage === "supabase"
+                ? "Reports you chose to keep are also on the server. This clears this browser; ask the operator to remove the stored copies."
+                : "Nothing is stored on the server, so this is everything."}
+            </p>
+
+            <div className="flex flex-wrap items-center gap-[0.5rem]">
+              <DeleteButton
+                tile={28}
+                className="rounded-[0.375rem]"
+                onConfirm={() => {
+                  const removed = eraseLocal();
+                  setErased(removed);
+                  setUsage({ keys: 0, bytes: 0 });
+                  setDraft((d) => ({ ...d, key: "" }));
+                  onErased();
+                }}
+                onCancel={() => undefined}
+              />
+              <span className="text-[0.75rem] text-ink-3">
+                {erased === null
+                  ? "Hold to delete everything"
+                  : erased === 0
+                    ? "There was nothing stored."
+                    : `Deleted ${erased} ${erased === 1 ? "key" : "keys"}. Reloading…`}
+              </span>
+            </div>
+          </div>
         </Card>
       </div>
 

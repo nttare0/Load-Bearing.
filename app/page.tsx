@@ -466,6 +466,58 @@ export default function Home() {
     [analyses, append, current]
   );
 
+  /**
+   * Send: one box, two destinations, chosen by the model.
+   *
+   * The composer used to make the person pick Ask or Agent before sending, using
+   * a regex to guess a default. Both halves of that were the app's job. Now the
+   * message goes to `/api/intent`, which is one short call with a one-word
+   * answer, and whichever route it names is the one that runs.
+   *
+   * The classifier can fail, and when it does the send still goes through: the
+   * rule-based guess is used and the run is labelled as guessed in the thread, so
+   * a mis-route is visible rather than mysterious.
+   */
+  const send = useCallback(
+    async (text: string, keep: boolean, effort?: string) => {
+      if (!current) return;
+
+      let intent: "plan" | "question" = "plan";
+      let guessed = true;
+      try {
+        const response = await fetch("/api/intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...modelHeaders },
+          body: JSON.stringify({ text }),
+        });
+        if (response.ok) {
+          const data = (await response.json()) as { intent?: "plan" | "question"; fallback?: boolean };
+          if (data.intent === "plan" || data.intent === "question") {
+            intent = data.intent;
+            guessed = data.fallback === true;
+          }
+        }
+      } catch {
+        // Unreachable classifier: fall through to the default and say so.
+      }
+
+      if (intent === "question") await ask(text, effort);
+      else await analyze(text, keep, { effort });
+
+      // One line on the turn, so the routing is not invisible work. Only shown
+      // when the classifier did not get to answer, which is the case worth
+      // knowing about.
+      if (guessed) {
+        toast.message(
+          intent === "question"
+            ? "Answered from your workspace. Add a model key in Settings and this decides itself."
+            : "Ran the five passes. Add a model key in Settings and this decides itself."
+        );
+      }
+    },
+    [analyze, ask, current]
+  );
+
   /** Run a plan again from its latest text, without re-pasting it. */
   const rerun = useCallback(
     (planId: string) => {
@@ -669,8 +721,7 @@ export default function Home() {
 
   const composer = (
     <Composer
-      onAnalyze={(text, keep, effort) => void analyze(text, keep, { effort })}
-      onAsk={(question) => void ask(question, thinking)}
+      onSend={(text, keep, effort) => send(text, keep, effort ?? thinking)}
       busy={busy}
       aiMode={mode}
       workspaceName={currentTitle}

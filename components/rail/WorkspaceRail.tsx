@@ -117,11 +117,16 @@ export function WorkspaceRail({
                   </span>
                 </button>
 
+                {/* Always visible, not hover-only.
+                    `opacity-0 group-hover` is invisible on a touch screen, which
+                    is where most deleting actually happens. Dimmed at rest and
+                    coloured on hover gets the same quietness without making the
+                    control unreachable. */}
                 <button
                   type="button"
                   onClick={() => setPendingDelete(w.id)}
                   aria-label={`Delete ${title}`}
-                  className="mr-[0.5rem] shrink-0 rounded-[0.25rem] p-[0.0625rem] text-ink-3 opacity-0 hover:text-[var(--to-danger)] focus-visible:opacity-100 group-hover/row:opacity-100"
+                  className="mr-[0.375rem] shrink-0 rounded-[0.25rem] p-[0.1875rem] text-ink-3/50 transition-colors hover:bg-[var(--to-surface-2)] hover:text-[var(--to-danger)] focus-visible:text-[var(--to-danger)]"
                 >
                   <Trash2 aria-hidden className="size-3.5" />
                 </button>
