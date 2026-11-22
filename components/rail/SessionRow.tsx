@@ -132,7 +132,12 @@ export function SessionRow({
               onDelete();
               setConfirmingDelete(false);
             }}
-            onCancel={() => setConfirmingDelete(false)}
+            onCancel={() => {
+              // The confirmation unmounts the button that just took focus, so
+              // hand focus to the row's actions first.
+              menu.current?.querySelector("summary")?.focus();
+              setConfirmingDelete(false);
+            }}
           />
         </div>
       )}
@@ -148,6 +153,5 @@ function formatUpdatedAt(value: string): string {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-    timeZone: "UTC",
   }).format(date);
 }

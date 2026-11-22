@@ -55,12 +55,15 @@ Keep types explicit at storage boundaries, parse persisted JSON as `unknown`, na
 try {
   const parsed: unknown = JSON.parse(raw);
   if (!Array.isArray(parsed)) return { kind: "invalid", raw };
+  // Any malformed record makes the whole value invalid. Filtering would turn
+  // an all-malformed array into "ok, empty" and allow a blank overwrite.
+  if (!parsed.every(isPersistedWorkspace)) return { kind: "invalid", raw };
   return {
     kind: "ok",
-    workspaces: parsed.filter(isWorkspace).map((workspace) => ({
+    workspaces: parsed.map((workspace) => ({
       ...workspace,
-      folders: Array.isArray(workspace.folders) ? workspace.folders : [],
-      resources: Array.isArray(workspace.resources) ? workspace.resources : [],
+      folders: workspace.folders ?? [],
+      resources: workspace.resources ?? [],
     })),
   };
 } catch {

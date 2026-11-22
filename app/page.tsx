@@ -235,6 +235,17 @@ export default function Home() {
   /** Every model call carries the visitor's key when there is one. */
   const modelHeaders = useMemo(() => llmHeaders(llm), [llm]);
 
+  // While data exists only in this tab, leaving the page would discard it. The
+  // browser's own confirmation is the choice the user gets.
+  useEffect(() => {
+    if (!writeFailure && !workspaceReadIssue) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [writeFailure, workspaceReadIssue]);
+
   /** The one place workspace changes are committed: memory first, then storage. */
   const commitWorkspaces = useCallback((next: Workspace[]) => {
     workspacesRef.current = next;
@@ -750,8 +761,14 @@ export default function Home() {
     }
 
     const stored = result.kind === "ok" ? result.workspaces : [];
+    // Keep anything this tab has touched, and the workspace on screen: a send
+    // in flight still targets it, and dropping it would lose the turn.
     const started = workspacesRef.current.filter(
-      (w) => w.messages.length > 0 || w.plans.length > 0
+      (w) =>
+        w.messages.length > 0 ||
+        w.plans.length > 0 ||
+        w.archivedAt !== undefined ||
+        w.id === currentId
     );
     const list = [...stored, ...started];
     const next = list.length > 0 ? list : [createWorkspace()];
@@ -766,7 +783,7 @@ export default function Home() {
     commitWorkspaces(next);
     writeCurrentId(selected);
     toast.success("Saved workspaces loaded.");
-  }, [commitWorkspaces]);
+  }, [commitWorkspaces, currentId]);
 
   const deleteResource = useCallback(
     (resourceId: string) => {
@@ -1003,6 +1020,9 @@ export default function Home() {
                     Export original data
                   </Button>
                 )}
+                <Button size="sm" variant="outline" onClick={exportUnsavedWorkspaces}>
+                  Export this tab&apos;s workspaces
+                </Button>
                 <Button size="sm" onClick={retryWorkspaceRead}>
                   Retry
                 </Button>
