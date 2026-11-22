@@ -120,6 +120,8 @@ export type DeleteButtonProps = Omit<
   onCancel?: () => void;
   /** Edge of the trigger square, in pixels. Defaults to the 48px tile. */
   tile?: number;
+  /** Accessible name for the confirmation trigger. */
+  triggerLabel?: string;
 };
 
 export function DeleteButton({
@@ -127,6 +129,7 @@ export function DeleteButton({
   onConfirm,
   onCancel,
   tile = TILE,
+  triggerLabel = "Delete",
   ...props
 }: DeleteButtonProps) {
   // The rail is narrow, so the whole control scales off one number: the panel
@@ -189,7 +192,7 @@ export function DeleteButton({
       <motion.button
         ref={trigger}
         type="button"
-        aria-label="Delete"
+        aria-label={triggerLabel}
         aria-expanded={open}
         onClick={() => {
           if (open) return resolve("kept");

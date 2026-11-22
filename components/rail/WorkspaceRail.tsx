@@ -1,174 +1,153 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Trash2 } from "lucide-react";
-import { AnimatedCounter } from "@/components/rare/animated-counter";
-import { DeleteButton } from "@/components/rare/delete-button";
-import { Card, CardTitle } from "@/components/rail/panels";
-import { IconButton, InlineInput } from "@/components/rail/parts";
-import type { Workspace } from "@/lib/workspace";
+import { useEffect, useMemo, useState } from "react";
+import { Archive, Clock3, Plus, Search } from "lucide-react";
+import { Card } from "@/components/rail/panels";
+import { SessionRow } from "@/components/rail/SessionRow";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { groupSessions, searchSessions, type SessionListItem } from "@/lib/session-list";
 
-/**
- * The chat list, in the left panel.
- *
- * One chat, one workspace: each row is a conversation with its own messages,
- * plans, reports and folders, and the row says so in the smallest honest words —
- * `3 messages · 1 report`, or `empty`.
- *
- * This panel holds nothing else. Files and connectors moved to the right, which
- * is what lets the left column answer one question ("which conversation?")
- * instead of four.
- */
+const PAGE_SIZE = 30;
+
+/** The left-side session history; list state stays local to this panel. */
 export function WorkspaceRail({
   workspaces,
   currentId,
   onSelect,
   onCreate,
   onDelete,
+  onRename,
+  onArchive,
+  onRestore,
 }: {
-  workspaces: { workspace: Workspace; title: string; reports: number; messages: number }[];
+  workspaces: SessionListItem[];
   currentId: string | null;
   onSelect: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, name: string) => void;
+  onArchive: (id: string) => void;
+  onRestore: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [includeArchived, setIncludeArchived] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const term = query.trim().toLowerCase();
-  const shown = term
-    ? workspaces.filter(
-        ({ workspace: w, title }) =>
-          title.toLowerCase().includes(term) ||
-          w.name.toLowerCase().includes(term) ||
-          w.resources.some((r) => r.title.toLowerCase().includes(term)) ||
-          w.messages.some((m) => m.text.toLowerCase().includes(term))
-      )
-    : workspaces;
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedQuery(query), 180);
+    return () => window.clearTimeout(timeout);
+  }, [query]);
+
+  useEffect(() => setVisibleCount(PAGE_SIZE), [debouncedQuery, includeArchived]);
+
+  const matches = useMemo(
+    () => searchSessions(workspaces, debouncedQuery, includeArchived),
+    [debouncedQuery, includeArchived, workspaces]
+  );
+  const groups = useMemo(() => groupSessions(matches.slice(0, visibleCount)), [matches, visibleCount]);
+  const archivedMatches = useMemo(
+    () => searchSessions(workspaces, debouncedQuery, true).filter(({ workspace }) => workspace.archivedAt).length,
+    [debouncedQuery, workspaces]
+  );
 
   return (
-    <Card grow>
-      <CardTitle title="Chats">
-        <AnimatedCounter
-          value={workspaces.length}
-          separator=""
-          className="shrink-0 pr-[0.125rem] text-[0.6875rem] tabular-nums text-ink-3"
-        />
-        <IconButton
-          label="Find a chat"
-          expanded={searching}
-          onClick={() => setSearching((v) => !v)}
+    <Card grow className="rounded-none border-0">
+      <div className="flex shrink-0 flex-col gap-3 border-b border-[var(--to-border)] p-3">
+        <a href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+          <img src="/icon.svg" alt="" width="24" height="24" className="size-6" />
+          <span>Load-Bearing</span>
+        </a>
+
+        <Button type="button" onClick={onCreate} className="w-full justify-start gap-2">
+          <Plus aria-hidden className="size-4" /> New analysis
+        </Button>
+
+        <label className="relative block">
+          <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-3" />
+          <Input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search conversations"
+            aria-label="Search conversations"
+            className="h-9 pl-9 text-sm"
+          />
+        </label>
+
+        <Button
+          type="button"
+          variant={includeArchived ? "secondary" : "ghost"}
+          size="sm"
+          aria-pressed={includeArchived}
+          onClick={() => setIncludeArchived((value) => !value)}
+          className="w-full justify-start gap-2 text-ink-3"
         >
-          <Search aria-hidden className="size-4" />
-        </IconButton>
-      </CardTitle>
+          <Archive aria-hidden className="size-3.5" />
+          Include archived
+          {archivedMatches > 0 && <span className="ml-auto tabular-nums">{archivedMatches}</span>}
+        </Button>
+      </div>
 
-      {searching && (
-        <InlineInput
-          value={query}
-          onChange={setQuery}
-          placeholder="Find a chat or report"
-          onCancel={() => {
-            setQuery("");
-            setSearching(false);
-          }}
-        />
-      )}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center justify-between px-3 py-2">
+          <h2 className="text-xs font-medium text-ink-2">Recent sessions</h2>
+          <span className="text-xs tabular-nums text-ink-3">{matches.length}</span>
+        </div>
 
-      <ul className="min-h-0 flex-1 overflow-y-auto border-t border-[var(--to-border)] py-[0.1875rem]">
-        {shown.map(({ workspace: w, title, reports, messages }) => {
-          const active = w.id === currentId;
-          const deleting = pendingDelete === w.id;
-
-          return (
-            <li key={w.id} className="group/row">
-              <div
-                className={`flex items-center ${
-                  active ? "bg-[var(--to-surface-2)]" : "hover:bg-[var(--to-surface-2)]"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => onSelect(w.id)}
-                  aria-current={active ? "true" : undefined}
-                  className="flex min-w-0 flex-1 flex-col gap-[0.0625rem] px-[0.625rem] py-[0.3125rem] text-left"
-                >
-                  <span
-                    className={`w-full min-w-0 truncate text-[0.8125rem] ${
-                      active ? "text-foreground" : "text-ink-2"
-                    }`}
-                  >
-                    {title}
-                  </span>
-                  <span className="flex items-center gap-[0.25rem] text-[0.625rem] text-ink-3">
-                    {messages === 0 ? (
-                      /* Not "empty" — nothing is wrong with it. It is a new chat
-                         waiting for a plan, and the row should say the same thing
-                         the canvas says. */
-                      "nothing sent yet"
-                    ) : (
-                      <>
-                        <span>{messages === 1 ? "1 message" : `${messages} messages`}</span>
-                        <span aria-hidden>·</span>
-                        <span>{reports === 1 ? "1 report" : `${reports} reports`}</span>
-                      </>
-                    )}
-                  </span>
-                </button>
-
-                {/* Always visible, not hover-only.
-                    `opacity-0 group-hover` is invisible on a touch screen, which
-                    is where most deleting actually happens. Dimmed at rest and
-                    coloured on hover gets the same quietness without making the
-                    control unreachable. */}
-                <button
-                  type="button"
-                  onClick={() => setPendingDelete(w.id)}
-                  aria-label={`Delete ${title}`}
-                  className="mr-[0.375rem] shrink-0 rounded-[0.25rem] p-[0.1875rem] text-ink-3/50 transition-colors hover:bg-[var(--to-surface-2)] hover:text-[var(--to-danger)] focus-visible:text-[var(--to-danger)]"
-                >
-                  <Trash2 aria-hidden className="size-3.5" />
-                </button>
-              </div>
-
-              {deleting && (
-                <div className="bg-[var(--to-surface)] px-[0.625rem] py-[0.375rem]">
-                  <p className="text-[0.6875rem] leading-[1.5] text-ink-3">
-                    Delete “{title}” and the {reports === 1 ? "report" : `${reports} reports`} in it?
-                  </p>
-                  <DeleteButton
-                    tile={26}
-                    className="mt-[0.25rem] rounded-[0.375rem]"
-                    onConfirm={() => {
-                      onDelete(w.id);
-                      setPendingDelete(null);
-                    }}
-                    onCancel={() => setPendingDelete(null)}
+        <ul aria-label="Conversation history" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-2">
+          {groups.map(({ label, items }) => (
+            <li key={label}>
+              <h3 className="sticky top-0 z-10 bg-[var(--to-surface)] px-2 py-1.5 text-[0.6875rem] font-medium uppercase tracking-wide text-ink-3">
+                {label}
+              </h3>
+              <ul>
+                {items.map((item) => (
+                  <SessionRow
+                    key={item.workspace.id}
+                    item={item}
+                    active={item.workspace.id === currentId}
+                    onSelect={() => onSelect(item.workspace.id)}
+                    onRename={(name) => onRename(item.workspace.id, name)}
+                    onArchive={() => onArchive(item.workspace.id)}
+                    onRestore={() => onRestore(item.workspace.id)}
+                    onDelete={() => onDelete(item.workspace.id)}
                   />
-                </div>
-              )}
+                ))}
+              </ul>
             </li>
-          );
-        })}
+          ))}
 
-        {shown.length === 0 && (
-          <li className="px-[0.625rem] py-[0.25rem] text-[0.8125rem] leading-[1.5] text-ink-3">
-            Nothing matches.
-          </li>
+          {query !== debouncedQuery && (
+            <li role="status" className="flex items-center gap-2 px-3 py-4 text-sm text-ink-3">
+              <Clock3 aria-hidden className="size-4" /> Searching conversations…
+            </li>
+          )}
+
+          {matches.length === 0 && query === debouncedQuery && (
+            <li className="px-3 py-4 text-sm leading-relaxed text-ink-3">
+              {query.trim() && archivedMatches > 0 && !includeArchived
+                ? "Matching archived sessions are hidden. Turn on Include archived to see them."
+                : query.trim()
+                  ? "No conversations match that search."
+                  : "Your saved analyses will appear here."}
+            </li>
+          )}
+        </ul>
+
+        {matches.length > visibleCount && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
+            className="m-2 shrink-0"
+          >
+            Load more sessions
+          </Button>
         )}
-      </ul>
-
-      <button
-        type="button"
-        onClick={onCreate}
-        className="flex shrink-0 items-center gap-[0.3125rem] border-t border-[var(--to-border)] px-[0.625rem] py-[0.375rem] text-[0.75rem] text-ink-3 hover:bg-[var(--to-surface-2)] hover:text-foreground"
-      >
-        <span aria-hidden className="text-[0.875rem] leading-none">
-          +
-        </span>
-        New chat
-      </button>
+      </div>
     </Card>
   );
 }
