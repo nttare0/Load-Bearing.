@@ -79,6 +79,14 @@ test("pressing New chat twice lands on the same blank chat", () => {
   assert.equal(target.workspace.id, first.id);
 });
 
+test("New chat makes a fresh workspace instead of reusing an archived blank one", () => {
+  const archived = { ...createWorkspace(), archivedAt: "2026-11-10T12:00:00.000Z" };
+  const made = createWorkspace();
+  const target = newChatTarget([archived], () => made);
+  assert.equal(target.reused, false);
+  assert.equal(target.workspace.id, made.id);
+});
+
 test("New chat makes a new one once the blank one has something in it", () => {
   const used = { ...createWorkspace(), name: "Kigali kitchen", messages: [{ id: "m1" }] as never };
   const made = createWorkspace();

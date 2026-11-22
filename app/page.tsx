@@ -16,6 +16,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { MobileBar } from "@/components/MobileBar";
 import { Panel } from "@/components/rail/panels";
 import { WorkspaceRail } from "@/components/rail/WorkspaceRail";
+import { Button } from "@/components/ui/button";
 import { DEFAULT_EFFORT, type Effort } from "@/lib/effort";
 import {
   EMPTY_SETTINGS,
@@ -29,17 +30,21 @@ import { bandLabel } from "@/lib/score";
 import type { Analysis } from "@/lib/schema";
 import {
   createWorkspace,
+  exportWorkspacesText,
+  hydrateWorkspaceState,
   nameFromPlan,
   NEW_CHAT_TITLE,
   newChatTarget,
   titleOf,
   newId,
   readCurrentId,
-  readWorkspaces,
+  readWorkspacesResult,
   writeCurrentId,
   writeWorkspaces,
   type Message,
   type Workspace,
+  type WorkspaceReadIssue,
+  type WriteFailure,
 } from "@/lib/workspace";
 
 const LS_ANALYSES = "load-bearing:analyses";
@@ -79,7 +84,9 @@ export default function Home() {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [mobilePanel, setMobilePanel] = useState<"sessions" | "workspace" | null>(null);
+  const [wideViewport, setWideViewport] = useState(false);
   const [keep, setKeep] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"demo" | "live" | null>(null);
@@ -92,16 +99,20 @@ export default function Home() {
   /** The simulation skill, as reported by the server. Off unless it says otherwise. */
   const [mirofish, setMirofish] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [workspaceReadIssue, setWorkspaceReadIssue] = useState<WorkspaceReadIssue | null>(null);
+  // Keep workspace writes disabled until hydration confirms the stored list is
+  // readable. In particular, an invalid record must not be replaced by edits
+  // to the temporary in-memory workspace used to keep the canvas usable.
+  const workspaceWritesAllowed = useRef(false);
   /**
-   * Two panels, independent of each other:
-   *
-   *   left  — the chat list
-   *   right — files and activity, then connectors, with settings over them
-   *
-   * They used to be one `face` value shared by both sides, which meant opening
-   * files closed the chat list and vice versa — a menu pretending to be a
-   * layout. There is only one panel left, so there is only one state to keep.
+   * The latest workspace list, readable synchronously. Writes are computed from
+   * this and never run inside a state updater, so each change is persisted once
+   * and the save outcome is known to the caller.
    */
+  const workspacesRef = useRef<Workspace[]>([]);
+  /** Set when the browser refused the last save. The tab still works; the data is not durable. */
+  const [writeFailure, setWriteFailure] = useState<WriteFailure | null>(null);
+  /** The session history and workspace panels collapse independently. */
   const [leftOpen, setLeftOpen] = useState(true);
   const [thinking, setThinking] = useState<Effort>(DEFAULT_EFFORT);
   /** The visitor's own model key, if they brought one. */
@@ -131,12 +142,28 @@ export default function Home() {
   const [draftPlan, setDraftPlan] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const wide = window.matchMedia("(min-width: 1280px)");
+    const tabletUp = window.matchMedia("(min-width: 768px)");
+    const syncLayout = () => {
+      setWideViewport(wide.matches);
+      if (tabletUp.matches) setMobilePanel(null);
+    };
+    syncLayout();
+    wide.addEventListener("change", syncLayout);
+    tabletUp.addEventListener("change", syncLayout);
+    return () => {
+      wide.removeEventListener("change", syncLayout);
+      tabletUp.removeEventListener("change", syncLayout);
+    };
+  }, []);
+
   // ---- load once, from the browser ----
   useEffect(() => {
     try {
       const stored = localStorage.getItem(LS_ANALYSES);
       if (stored) setAnalyses(JSON.parse(stored) as Record<string, Analysis>);
-      setPanelOpen(localStorage.getItem(LS_PANEL) === "1");
+      setPanelOpen(localStorage.getItem(LS_PANEL) !== "0");
       setLeftOpen(localStorage.getItem(LS_RAIL) !== "0");
       setLlm(readSettings());
       const savedThinking = localStorage.getItem(LS_THINKING);
@@ -148,16 +175,25 @@ export default function Home() {
       // A corrupt cache is not worth a dialog.
     }
 
-    let list = readWorkspaces();
-    if (list.length === 0) {
-      const first = createWorkspace();
-      list = [first];
-      writeWorkspaces(list);
-      writeCurrentId(first.id);
+    const readResult = readWorkspacesResult();
+    let savedCurrentId: string | null = null;
+    try {
+      savedCurrentId = readCurrentId();
+    } catch {
+      // The first loaded workspace is the safe fallback when storage is unavailable.
     }
-    setWorkspaces(list);
-    const saved = readCurrentId();
-    setCurrentId(saved && list.some((w) => w.id === saved) ? saved : list[0].id);
+
+    const initial = hydrateWorkspaceState(readResult, savedCurrentId);
+    workspaceWritesAllowed.current = initial.issue === null;
+    setWorkspaceReadIssue(initial.issue);
+    workspacesRef.current = initial.workspaces;
+    setWorkspaces(initial.workspaces);
+    setCurrentId(initial.currentId);
+    if (initial.persistInitial && workspaceWritesAllowed.current) {
+      const saved = writeWorkspaces(initial.workspaces);
+      writeCurrentId(initial.currentId);
+      setWriteFailure(saved.saved ? null : saved);
+    }
     setHydrated(true);
 
     fetch("/api/health")
@@ -199,20 +235,25 @@ export default function Home() {
   /** Every model call carries the visitor's key when there is one. */
   const modelHeaders = useMemo(() => llmHeaders(llm), [llm]);
 
-  const persist = useCallback((next: Workspace[]) => {
+  /** The one place workspace changes are committed: memory first, then storage. */
+  const commitWorkspaces = useCallback((next: Workspace[]) => {
+    workspacesRef.current = next;
     setWorkspaces(next);
-    writeWorkspaces(next);
+    if (!workspaceWritesAllowed.current) return;
+    const outcome = writeWorkspaces(next);
+    setWriteFailure(outcome.saved ? null : outcome);
   }, []);
+
+  const persist = useCallback((next: Workspace[]) => commitWorkspaces(next), [commitWorkspaces]);
 
   const update = useCallback(
     (id: string, change: (workspace: Workspace) => Workspace) => {
-      setWorkspaces((prev) => {
-        const next = prev.map((w) => (w.id === id ? { ...change(w), updatedAt: new Date().toISOString() } : w));
-        writeWorkspaces(next);
-        return next;
-      });
+      const next = workspacesRef.current.map((w) =>
+        w.id === id ? { ...change(w), updatedAt: new Date().toISOString() } : w
+      );
+      commitWorkspaces(next);
     },
-    []
+    [commitWorkspaces]
   );
 
   const saveAnalyses = useCallback((next: Record<string, Analysis>) => {
@@ -589,8 +630,7 @@ export default function Home() {
   const select = useCallback((id: string) => {
     setCurrentId(id);
     writeCurrentId(id);
-    // The panel is a drawer: picking a workspace closes it.
-    setPanelOpen(false);
+    setMobilePanel(null);
   }, []);
 
   /**
@@ -602,6 +642,7 @@ export default function Home() {
    * for evidence to land on, so two chats about two plans cannot cross.
    */
   const create = useCallback(() => {
+    setMobilePanel(null);
     /*
      * Pressing New chat twice does not make two chats.
      *
@@ -639,6 +680,121 @@ export default function Home() {
     [currentId, persist, select, workspaces]
   );
 
+  const renameSession = useCallback(
+    (id: string, name: string) => update(id, (workspace) => ({ ...workspace, name })),
+    [update]
+  );
+
+  const archiveSession = useCallback(
+    (id: string) => update(id, (workspace) => ({ ...workspace, archivedAt: new Date().toISOString() })),
+    [update]
+  );
+
+  const restoreSession = useCallback(
+    (id: string) => update(id, (workspace) => ({ ...workspace, archivedAt: undefined })),
+    [update]
+  );
+
+  /** Save a text file the browser can keep; the same mechanism the report export uses. */
+  const downloadText = useCallback((filename: string, text: string) => {
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const stamp = () => new Date().toISOString().replace(/[:.]/g, "-");
+
+  /** Unreadable stored data: the original value is exported byte for byte. */
+  const exportOriginalStorage = useCallback(() => {
+    if (workspaceReadIssue?.kind !== "invalid") return;
+    downloadText(`load-bearing-workspaces-original-${stamp()}.json`, workspaceReadIssue.raw);
+    toast.message("Original saved data exported. It has not been changed in this browser.");
+  }, [downloadText, workspaceReadIssue]);
+
+  /** A failed save: export what this tab holds, since storage does not have it. */
+  const exportUnsavedWorkspaces = useCallback(() => {
+    downloadText(
+      `load-bearing-workspaces-unsaved-${stamp()}.json`,
+      exportWorkspacesText(workspacesRef.current)
+    );
+    toast.message("Unsaved workspaces exported.");
+  }, [downloadText]);
+
+  /** Try the save again with what this tab holds. */
+  const retryWorkspaceWrite = useCallback(() => {
+    const outcome = writeWorkspaces(workspacesRef.current);
+    writeCurrentId(currentId ?? workspacesRef.current[0]?.id ?? "");
+    setWriteFailure(outcome.saved ? null : outcome);
+    if (outcome.saved) toast.success("Workspaces saved in this browser.");
+    else toast.error("Browser storage still refused the save.");
+  }, [currentId]);
+
+  /**
+   * Read the stored data again. If it is readable now, the stored list becomes
+   * the source of truth and any chat started in this tab is kept alongside it.
+   */
+  const retryWorkspaceRead = useCallback(() => {
+    const result = readWorkspacesResult();
+    if (result.kind === "invalid" || result.kind === "unavailable") {
+      setWorkspaceReadIssue(result);
+      toast.error(
+        result.kind === "invalid"
+          ? "The saved data still cannot be read. Nothing was changed."
+          : "Browser storage is still unavailable."
+      );
+      return;
+    }
+
+    const stored = result.kind === "ok" ? result.workspaces : [];
+    const started = workspacesRef.current.filter(
+      (w) => w.messages.length > 0 || w.plans.length > 0
+    );
+    const list = [...stored, ...started];
+    const next = list.length > 0 ? list : [createWorkspace()];
+    const savedId = readCurrentId();
+    const selected =
+      started.at(-1)?.id ??
+      (savedId && next.some((w) => w.id === savedId) ? savedId : next[0].id);
+
+    workspaceWritesAllowed.current = true;
+    setWorkspaceReadIssue(null);
+    setCurrentId(selected);
+    commitWorkspaces(next);
+    writeCurrentId(selected);
+    toast.success("Saved workspaces loaded.");
+  }, [commitWorkspaces]);
+
+  const deleteResource = useCallback(
+    (resourceId: string) => {
+      if (!currentId) return;
+      update(currentId, (workspace) => ({
+        ...workspace,
+        resources: workspace.resources.filter((resource) => resource.id !== resourceId),
+      }));
+      toast.success("Saved item deleted from this workspace.");
+    },
+    [currentId, update]
+  );
+
+  const editClaim = useCallback(
+    (analysisId: string, ref: string, text: string) => {
+      const analysis = analyses[analysisId];
+      if (!analysis) return;
+      const next: Analysis = {
+        ...analysis,
+        updatedAt: new Date().toISOString(),
+        claims: analysis.claims.map((claim) => claim.ref === ref ? { ...claim, claim: text } : claim),
+      };
+      saveAnalyses({ ...analyses, [analysisId]: next });
+      toast.success("Assumption saved in this browser.");
+    },
+    [analyses, saveAnalyses]
+  );
+
   const prevOf = useCallback(
     (analysisId: string) => previousRun(planForRun(plans, analysisId), analyses, analysisId),
     [analyses, plans]
@@ -660,11 +816,7 @@ export default function Home() {
     });
   }, []);
 
-  // The shelf — folders, filed reports, moving things between them — lived in
-  // the right column's Files card, and the column is gone. The data model stays
-  // (a workspace still carries `folders` and `resources`, and still exports with
-  // them); only the code that drove that card goes, rather than sitting here
-  // unused.
+  // Workspace tabs below read only from this session's saved reports and resources.
 
   const rename = useCallback(
     (name: string) => {
@@ -768,6 +920,9 @@ export default function Home() {
             onSelect={select}
             onCreate={create}
             onDelete={remove}
+            onRename={renameSession}
+            onArchive={archiveSession}
+            onRestore={restoreSession}
           />
         </Panel>
       </div>
@@ -804,6 +959,56 @@ export default function Home() {
             threaded ? "pt-[1.25rem]" : "pt-[3.75rem]"
           } pb-[4.5rem] md:pb-[1.5rem]`}
         >
+          {writeFailure && !workspaceReadIssue && (
+            <div
+              role="alert"
+              className="mb-4 rounded-md border border-[var(--to-warning)] bg-[var(--to-surface-2)] p-3 text-sm text-[var(--to-ink)]"
+            >
+              <p className="font-medium">
+                {writeFailure.reason === "quota"
+                  ? "Browser storage is full. Recent changes are only in this tab."
+                  : "Browser storage refused the save. Recent changes are only in this tab."}
+              </p>
+              <p className="mt-1 text-[var(--to-ink-3)]">
+                They will be lost if this tab closes or reloads.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={exportUnsavedWorkspaces}>
+                  Export unsaved workspaces
+                </Button>
+                <Button size="sm" onClick={retryWorkspaceWrite}>
+                  Retry save
+                </Button>
+              </div>
+            </div>
+          )}
+          {workspaceReadIssue && (
+            <div
+              role="alert"
+              className="mb-4 rounded-md border border-[var(--to-warning)] bg-[var(--to-surface-2)] p-3 text-sm text-[var(--to-ink)]"
+            >
+              <p className="font-medium">
+                {workspaceReadIssue.kind === "invalid"
+                  ? "Saved workspace data could not be read."
+                  : "Browser storage could not be accessed."}
+              </p>
+              <p className="mt-1 text-[var(--to-ink-3)]">
+                {workspaceReadIssue.kind === "invalid"
+                  ? "The original saved value has been left untouched. This tab is using a temporary workspace and will not write over it."
+                  : "This tab is using a temporary workspace. Workspace changes will not be saved until storage is available."}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {workspaceReadIssue.kind === "invalid" && (
+                  <Button size="sm" variant="outline" onClick={exportOriginalStorage}>
+                    Export original data
+                  </Button>
+                )}
+                <Button size="sm" onClick={retryWorkspaceRead}>
+                  Retry
+                </Button>
+              </div>
+            </div>
+          )}
           <ThreadWorkspace
             workspace={current}
             analyses={analyses}
